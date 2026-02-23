@@ -15,10 +15,9 @@ The flow is **stateful**, **cyclic**, and **planner-driven**.
 - **Supervisor / Planner**
 - **Memory** (Conversation, Personalization, Self-corrections, Agent memory)
 
-### Core execution agents (invoked by Planner)
-- **SLIC Agent**
-- **KnowledgeAgent**
-- **Data Query Agent**
+### Core execution agents (invoked conditionally by Planner)
+- **Knowledge Agent** — enterprise knowledge retrieval (RAG)
+- **Data Query Agent** — assessment data retrieval (MCP tools or SQL queries)
 
 ### Domain agents (invoked by Planner)
 - **Config Best Practice Domain Agent**
@@ -39,15 +38,16 @@ The flow is **stateful**, **cyclic**, and **planner-driven**.
 All core agents access data via a shared integration layer:
 
 ### MCP Resources / Tools
-- **SLIC DB / Engine**
-  - Stores/serves SLIC results
+- **MCP Tools**
+  - Assessment APIs (get_assessment_summary, compare_assessments, get_unresolved_issues, get_assessment_details)
+  - Provides pre-computed assessment results
 - **Vector DB**
-  - Human annotations (semantic layer)
-  - Institutional knowledge
-- **Trino DB**
-  - Metadata schema
-  - Schema cache
-  - Runtime context (data)
+  - Enterprise knowledge (RAG)
+  - Policies, standards, approved exceptions, organizational context
+- **Trino DB (SQL Path)**
+  - Raw configuration data
+  - Assessment metadata
+  - Requires schema + ontology for query generation
 
 The system must preserve a clean separation:
 - Planner orchestrates, does not fetch
@@ -60,27 +60,30 @@ The system must preserve a clean separation:
 
 The diagram indicates the following artifact flows into agents:
 
-### KnowledgeAgent receives
-- **Annotations / Knowledge / SLIC Results**
-- **Prompt + Task**
+### Knowledge Agent receives
+- **User intent** (from Intent Classifier)
+- **Task definition** (from Planner)
 
 ### Data Query Agent receives
-- **Runtime Context (data)**
-- **Human annotations (semantic layer)**
+- **Intent entities** (semantic parameters from Intent Classifier)
+- **Enterprise context** (optional, from Knowledge Agent task outputs)
+- **Schema + Ontology** (for SQL Path)
 
 ### Domain Agents (e.g., Config Best Practice) receive
-- **Answer + Task Result** (inputs/outputs from executed tasks)
-- **Runtime Context (data)**
-- **Institutional Knowledge**
-- **RAG chunks**
-- **SLIC Results**
+- **Assessment context** (from Data Query Agent task outputs)
+- **Enterprise context** (from Knowledge Agent task outputs, if available)
+- **Intent entities** (for scope filtering)
 
-These artifacts should be represented in shared state as:
-- `STATE.data.assessment_context` (canonical normalized context)
-- `STATE.knowledge.*` (assessment strategy and enterprise context)
-- `STATE.mcp.tool_calls[]` (+ results if provided)
-- `STATE.plan.tasks[]` (+ outputs captured as task results)
-- `STATE.findings.*` (validator outputs)
+These artifacts are represented in shared state as:
+- `STATE.intent.*` (intent_class, entities[])
+- `STATE.plan.tasks[]` (task definitions with embedded required_data and outputs)
+  - Each task contains `outputs: {}` where agent writes results
+  - Knowledge Agent writes: `outputs.enterprise_context` (RAG chunks)
+  - Data Query Agent writes: `outputs.assessment_context` (MCP or SQL data)
+  - Domain Agents write: `outputs.findings[]`, `outputs.summary`, `outputs.prioritized_risks[]`
+- `STATE.schema` (database structure for SQL Path)
+- `STATE.ontology` (data semantics for SQL Path)
+- `STATE.trace.*` (execution provenance)
 
 ---
 
@@ -88,29 +91,37 @@ These artifacts should be represented in shared state as:
 
 ### 4.1 Primary execution sequence
 1. **Semantic Router / Intent Classifier**
-   - Classifies input into `STATE.intent.*`
+   - Classifies input into `STATE.intent.intent_class`
+   - Extracts semantic entities into `STATE.intent.entities[]` (site, device, timeframe, severity, etc.)
 2. **Supervisor / Planner**
-   - Reads intent + memory
-   - Builds an explicit task plan with required data
-   - Chooses which execution agents to invoke
-3. **Planner executes tasks** by invoking one or more of:
-   - Data Query Agent (fetch/normalize)
-   - KnowledgeAgent (strategy + enrichment guidance)
-   - SLIC Agent (SLIC computation/retrieval via MCP resources)
-4. **Planner routes to Domain Agents** for validation
-5. **Planner synthesizes** results into final outcome and updates memory signals
+   - Reads intent + entities
+   - Builds conditional task plan:
+     - **Knowledge Agent task** (if enterprise context needed for query interpretation or policy reference)
+     - **Data Query Agent task** (if domain agent has data dependencies)
+     - **Domain Agent task(s)** (always - performs assessment/analysis)
+   - Each task includes embedded `required_data[]` for domain agents
+   - Tasks have `depends_on[]` for execution ordering
+3. **Graph executes tasks sequentially** (respecting dependencies):
+   - Knowledge Agent (conditional) → writes `task.outputs.enterprise_context` (RAG chunks)
+   - Data Query Agent (conditional) → writes `task.outputs.assessment_context` (MCP or SQL data)
+   - Domain Agent(s) → reads upstream task outputs, writes `task.outputs.findings[]` or `task.outputs.summary`
+4. **Graph returns final STATE** with all task outputs embedded
 
-### 4.2 Cycles (bounded)
-Cycles exist because:
-- required data is missing
-- evidence conflicts
-- SLIC hypotheses need enrichment
-- plan refinement is needed after intermediate results
+### 4.2 Single-pass execution (no replanning)
 
-**Loop policy (recommended)**
-- Maximum: **2 Planner iterations**
-- Maximum: **1 re-query attempt per iteration** (Data Query Agent)
-- On loop exhaustion: proceed with partial results + explicit missing inputs + increased risk_of_error
+**Current implementation**: Plan/execute pattern with single iteration
+- Planner creates complete task plan upfront
+- Tasks execute once in dependency order
+- No cycles or replanning logic
+
+**Data insufficiency handling**:
+- Domain agents qualify findings with `data_gaps[]` and `assumptions[]`
+- Confidence scores reflect evidence quality
+- Agents proceed with available data rather than blocking
+
+**Future enhancement** (Phase 2+):
+- Replanning may be reintroduced for complex multi-turn scenarios
+- Would require stop_conditions and iteration limits
 
 ---
 
@@ -119,20 +130,26 @@ Cycles exist because:
 ### Mandatory transitions
 - `Semantic Router/Intent Classifier → Supervisor/Planner` (always)
 
-### Planner to execution agents (based on plan/data sufficiency)
+### Planner to execution agents (conditional, based on requirements)
+- `Supervisor/Planner → Knowledge Agent`  
+  **Condition**: User query requires enterprise context interpretation:
+  - Follow-up questions needing policy/standard references
+  - Queries about organizational practices or approved exceptions
+  - Domain-specific terminology requiring enterprise knowledge
+  **Not invoked**: For well-known assessment requests with no enterprise context needs
+
 - `Supervisor/Planner → Data Query Agent`  
-  if any `plan.required_data[]` is not satisfied or runtime context must be retrieved/updated
+  **Condition**: Domain agent declares data dependencies (via `task.required_data[]`):
+  - Configuration assessment needs config data
+  - Compliance check needs assessment results
+  - Any domain agent with non-empty data dependencies
+  **Not invoked**: For queries that can be answered from conversation history or general knowledge
 
-- `Supervisor/Planner → KnowledgeAgent`  
-  if domain interpretation is needed, planning strategy is unclear, or additional institutional context is required
-
-- `Supervisor/Planner → SLIC Agent`  
-  if the request involves network/device diagnostics OR when `STATE.data.assessment_context.assets.*` is relevant and SLIC signatures should be produced/enriched
-
-### Execution agents back to Planner (always)
-- `Data Query Agent → Supervisor/Planner`
-- `KnowledgeAgent → Supervisor/Planner`
-- `SLIC Agent → Supervisor/Planner`
+### Execution agents to next task (via task dependency chain)
+- Knowledge Agent completes → marks task status 'completed', writes outputs
+- Data Query Agent completes → marks task status 'completed', writes outputs
+- Domain agents read upstream task outputs via `tasks.find(t => t.depends_on.includes(task_id))`
+- No explicit agent-to-Planner transitions (graph orchestrates via task execution order)
 
 ### Planner to domain agents
 - `Supervisor/Planner → Config Best Practice Domain Agent`
@@ -141,9 +158,10 @@ Cycles exist because:
 - `Supervisor/Planner → Assessment X Domain Agent (TBD)`
   when another specialized assessment is needed (only if implemented)
 
-### Domain agents back to Planner (always)
-- `Config Best Practice Domain Agent → Supervisor/Planner`
-- `Assessment X Domain Agent → Supervisor/Planner`
+### Domain agents complete execution (final task in chain)
+- Domain agents write final outputs to their task objects
+- Mark task status as 'completed'
+- Graph execution completes, returns final STATE to user interface
 
 ### Optional supporting agents (TBD hooks)
 - `Supervisor/Planner → Ambiguity Handler (TBD)`
@@ -169,37 +187,32 @@ flowchart TD
   U[User Prompt / context_kv] --> IR[Semantic Router / Intent Classifier]
   IR --> P[Supervisor / Planner]
 
-  P <--> M[(Memory\n- Conversation\n- Personalization\n- Self-corrections\n- Agent memory)]
+  P <--> M[(Memory - Conversation, Personalization, Self-corrections, Agent memory)]
 
-  %% Supporting agents (optional/TBD)
-  AH[Ambiguity Handler (TBD)] -.-> P
-  R[Reflector (TBD)] -.-> P
-  CP[Context Pruner (TBD)] -.-> P
-  CR[Context Recovery (TBD)] -.-> P
+  AH[Ambiguity Handler TBD] -.-> P
+  REFL[Reflector TBD] -.-> P
+  CP[Context Pruner TBD] -.-> P
+  CR[Context Recovery TBD] -.-> P
 
-  %% Core execution agents
-  P --> SLIC[SLIC Agent]
-  P --> K[KnowledgeAgent]
-  P --> DQ[Data Query Agent]
+  %% Core execution agents (conditional)
+  P -->|if enterprise context needed| K[Knowledge Agent]
+  P -->|if data dependencies exist| DQ[Data Query Agent]
 
-  SLIC --> P
-  K --> P
-  DQ --> P
+  K -->|writes task.outputs| P
+  DQ -->|writes task.outputs| P
 
-  %% Domain agents
   P --> CFG[Config Best Practice Domain Agent]
-  P --> AX[Assessment X (TBD) Domain Agent]
+  P --> AX[Assessment X TBD Domain Agent]
 
   CFG --> P
   AX --> P
 
-  %% Data/tool layer (conceptual)
   subgraph MCP[MCP Resources / Tools]
-    SDB[(SLIC DB / Engine\n- SLIC results)]
-    VDB[(Vector DB\n- Human Annotations\n- Institutional Knowledge)]
-    TDB[(Trino DB\n- Metadata Schema\n- Schema Cache\n- Runtime Context)]
+    MCPT[(MCP Tools - Assessment APIs, Pre-computed results)]
+    VDB[(Vector DB - Enterprise Knowledge RAG, Policies and Standards)]
+    TDB[(Trino DB - Raw config data, Schema and Ontology)]
   end
 
-  SLIC --- SDB
   K --- VDB
+  DQ --- MCPT
   DQ --- TDB
