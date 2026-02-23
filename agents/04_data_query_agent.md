@@ -16,7 +16,8 @@ If `STATE.intent.intent_class` matches a well-known intent in `STATE.routing.wel
 
 ### B) SQL Path (Complex/Bespoke Intents)
 If intent is not well-known OR MCP path is unavailable:
-- Generate a **read-only** SQL query based strictly on `STATE.schema`.
+- **Retrieve schema information** from `STATE.schema` (database structure) and `STATE.ontology` (semantic mappings)
+- Generate a **read-only** SQL query based on schema and ontology
 - Constraints:
   - SELECT only (no mutations)
   - LIMIT required
@@ -26,36 +27,215 @@ If intent is not well-known OR MCP path is unavailable:
 - Record the query plan in `STATE.sql.query_plan`.
 - Do NOT fabricate query results; set results to `unknown` unless provided.
 
-## Assessment Context (canonical output)
-Always write to own task object: `STATE.plan.tasks[<this_task_id>].outputs.assessment_context`
+**Schema Retrieval:**
+The agent requires two types of information to generate semantically correct queries:
 
-**Note:** Agent determines its task_id from `STATE.plan.tasks[]` by matching `owner: "Data Query Agent"` and `status: "in_progress"`.
+1. **Structural Schema** (`STATE.schema`):
+   - Database tables, columns, data types, constraints
+   - Join relationships and foreign keys
+   - Indexes and partitioning information
+   - Tells the agent **HOW** to query (technical structure)
 
-Structure:
+2. **Semantic Ontology** (`STATE.ontology`):
+   - Semantic meaning of tables, columns, and values
+   - Business/domain explanations for database elements
+   - Data dictionaries and value enumerations
+   - Relationships and business logic
+   - Tells the agent **WHAT** the data represents (semantic meaning)
+   
+   Examples:
+   - Table `findings`: "Contains security and configuration assessment results with severity classifications"
+   - Column `findings.category`: "Type of assessment finding" (values: 'security', 'configuration', 'compliance')
+   - Column `findings.severity_level`: "Risk severity rating" (values: 'critical', 'high', 'medium', 'low')
+   - Column `configs.site_id`: "Physical site location identifier where device is deployed"
+   - Table `assets`: "Device inventory with hardware and software metadata"
 
+**Schema Sources:**
+- **Pre-loaded**: Schema and ontology provided in STATE at initialization (static configuration)
+- **Dynamic**: Agent queries information_schema or metadata tables first (runtime discovery)
+- **Hybrid**: Core schema pre-loaded, extended metadata retrieved on-demand
+
+**Example Schema + Ontology Usage:**
+
+```
+Intent: "Show security issues for DataCenter-1"
+Entities: [{"type": "site", "value": "DataCenter-1"}]
+
+Agent reasoning:
+1. Read STATE.ontology: Table "findings" contains assessment results
+2. Read STATE.ontology: Column "findings.category" values include 'security' for security findings
+3. Read STATE.ontology: Column "findings.site_id" represents physical site location
+4. Read STATE.ontology: Entity type "site" semantically matches "site_id" columns
+5. Read STATE.schema: findings table structure (category TEXT, site_id VARCHAR, status TEXT)
+6. Generate query: SELECT * FROM findings WHERE category='security' AND site_id='DataCenter-1' LIMIT 100
+
+Without ontology: Agent wouldn't understand category='security' represents security issues
+Without ontology: Agent wouldn't know "DataCenter-1" should map to site_id column
+Without schema: Agent wouldn't know valid column names or data types
+```
+
+**Ontology Structure (Conceptual):**
 ```json
 {
-  "context_id": "auto",
-  "source_path": "mcp|sql",
-  "timestamp_utc": "auto",
-  "scope": {
-    "targets": [],
-    "site": null,
-    "time_range": { "from": null, "to": null }
+  "tables": {
+    "findings": {
+      "description": "Assessment results including security, configuration, and compliance findings",
+      "columns": {
+        "category": {
+          "description": "Type of assessment finding",
+          "type": "TEXT",
+          "values": ["security", "configuration", "compliance", "vulnerability"],
+          "semantics": "Classifies finding by assessment domain"
+        },
+        "site_id": {
+          "description": "Physical site location identifier",
+          "type": "VARCHAR(50)",
+          "semantics": "References organizational site/location where asset is deployed",
+          "entity_mapping": "site"
+        },
+        "severity_level": {
+          "description": "Risk severity rating",
+          "type": "TEXT",
+          "values": ["critical", "high", "medium", "low"],
+          "semantics": "Business impact and urgency classification"
+        },
+        "status": {
+          "description": "Remediation status",
+          "type": "TEXT",
+          "values": ["open", "in_progress", "resolved", "accepted_risk"],
+          "semantics": "Current state in remediation workflow"
+        }
+      }
+    },
+    "configs": {
+      "description": "Device configuration snapshots with versioning",
+      "columns": {
+        "device_id": {
+          "description": "Unique device identifier",
+          "type": "VARCHAR(100)",
+          "entity_mapping": "device"
+        },
+        "site_id": {
+          "description": "Site where device is located",
+          "type": "VARCHAR(50)",
+          "entity_mapping": "site"
+        }
+      }
+    }
   },
-  "assets": {
-    "inventory": [],
-    "topology": [],
-    "configs": [],
-    "telemetry": [],
-    "events": []
-  },
-  "provenance": [],
-  "errors": []
+  "entity_column_mapping": {
+    "site": ["findings.site_id", "configs.site_id", "assets.location"],
+    "device": ["configs.device_id", "assets.hostname"],
+    "severity": ["findings.severity_level"]
+  }
 }
 ```
 
-## Available Tools (MCP/Trino)
+**Note:** Schema and ontology management is an implementation detail. The agent contract assumes these are available in STATE. How they're populated (pre-loaded config, dynamic discovery, Knowledge Agent enrichment) is outside this agent's scope.
+
+## MCP Tool Parameter Binding
+
+The Data Query Agent is responsible for transforming generic entities from Intent Classifier into tool-specific parameters when invoking MCP tools.
+
+### Input Sources
+
+1. **STATE.intent.intent_class** - Determines which MCP tool to invoke
+2. **STATE.intent.entities[]** - Generic entity extractions from user input
+3. **Upstream task outputs** (optional) - Enterprise context from Knowledge Agent
+
+### Binding Process
+
+**Step 1: Read Intent Classification**
+- Extract `intent_class` and `entities[]` from STATE.intent
+- Determine assessment type and user-provided parameters
+
+**Step 2: Select MCP Tool**
+- Map `intent_class` to appropriate MCP tool
+- Example: `security_assessment` → `get_assessment_summary`
+
+**Step 3: Transform Entities to Tool Parameters**
+- Iterate through `entities[]` and map to tool-specific parameter names
+- Apply transformations (e.g., "last_7_days" → `lookback_days: 7`)
+
+**Step 4: Enrich from Enterprise Context (Optional)**
+- Find completed Knowledge Agent task in `STATE.plan.tasks[]`
+- Extract additional parameter values from `enterprise_context.retrieved_chunks[]`
+- Use enterprise context to provide defaults or augment scope
+
+**Step 5: Validate Required Parameters**
+- Check all required tool parameters have valid values
+- If missing, record error in assessment_context
+
+**Step 6: Invoke Tool**
+- Call MCP tool with bound parameters
+- Normalize result into canonical Assessment Context format
+
+### Entity-to-Parameter Mapping
+
+Entity types from Intent Classifier are **semantically matched** to tool-specific parameter names based on context and tool schema. The Data Query Agent understands the intent behind each entity type and maps it to the appropriate tool parameter(s).
+
+**Semantic Matching Approach:**
+- Entity `site` → maps to `site_id`, `assessment_scope`, or `location` depending on tool
+- Entity `timeframe` → transforms to `lookback_days`, `start_date`/`end_date`, or date range
+- Entity `severity` → maps to `severity_filter`, `priority`, or `minimum_priority`
+- Entity `device_type` → maps to `product_filter`, `platform`, or `device_type`
+
+The agent selects the appropriate mapping based on the tool's parameter schema and the semantic meaning of the entity.
+
+### Mapping Examples
+
+**Example 1: Simple entity mapping**
+
+Input entities: `severity="critical"`, `assessment_id="ASSESS-2026-001"`
+
+Tool selected: `get_assessment_summary`
+
+Resulting parameters:
+- `assessment_id` ← "ASSESS-2026-001"
+- `severity_filter` ← "critical"
+- `product_filter` ← "" (not provided, use default)
+
+**Example 2: Timeframe transformation**
+
+Input entity: `timeframe="last_7_days"`
+
+Tool selected: `get_assessment_summary`
+
+The agent transforms the natural language timeframe into numeric days:
+- `lookback_days` ← 7
+
+Alternatively, for tools requiring date ranges, transforms to:
+- `start_date` ← "2026-02-16"
+- `end_date` ← "2026-02-23"
+
+**Example 3: Enrichment from enterprise context**
+
+Input entity: `site="DataCenter-1"`
+
+Enterprise context retrieved from Knowledge Agent contains:
+- Content: "DataCenter-1 uses assessment scope 'dc1_prod'"
+- Metadata: topic="site_mapping"
+
+Tool selected: `get_unresolved_issues`
+
+Resulting parameters (enriched):
+- `assessment_scope` ← "dc1_prod" (from enterprise context)
+- Additional context: site identifier preserved for provenance tracking
+
+### Validation Rules
+
+- **Required parameters**: Validate all required tool parameters have values
+- **Missing entities**: If required entity missing, check enterprise context for defaults
+- **Invalid values**: Transform entity values to match tool schema (e.g., "last week" → 7)
+- **Conflicting entities**: Prioritize most specific entity (e.g., `device` over `device_type`)
+
+### Error Handling
+
+- **Missing required parameters**: Record error in `assessment_context.errors[]`, do not invoke tool
+- **Invalid parameter values**: Attempt transformation; if fails, record error
+- **Tool invocation failure**: Capture error in `assessment_context.errors[]`, set `source_path: "error"`
+
+## Available Tools (MCP)
 
 The Data Query Agent has access to the following tools for retrieving configuration assessment data from Trino:
 
@@ -293,4 +473,33 @@ When determining which tool to use:
 - **Record all tool calls** in `STATE.mcp.tool_calls[]` with expected schema
 - **Never fabricate** tool results; set to `unknown` if not provided
 - **Map results** to canonical Assessment Context format for downstream consistency
+
+## Assessment Context (canonical output)
+Always write to own task object: `STATE.plan.tasks[<this_task_id>].outputs.assessment_context`
+
+**Note:** Agent determines its task_id from `STATE.plan.tasks[]` by matching `owner: "Data Query Agent"` and `status: "in_progress"`.
+
+Structure:
+
+```json
+{
+  "context_id": "auto",
+  "source_path": "mcp|sql",
+  "timestamp_utc": "auto",
+  "scope": {
+    "targets": [],
+    "site": null,
+    "time_range": { "from": null, "to": null }
+  },
+  "assets": {
+    "inventory": [],
+    "topology": [],
+    "configs": [],
+    "telemetry": [],
+    "events": []
+  },
+  "provenance": [],
+  "errors": []
+}
+```
 ```

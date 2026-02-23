@@ -198,6 +198,154 @@ This document tracks known limitations in the current architecture and planned e
 
 ---
 
+### 9. Entity-to-Parameter Mapping as Semantic Matching
+**Status:** Current implementation uses semantic matching, may need explicit mapping
+
+**Current Behavior:**
+- Intent Classifier extracts generic entity types (site, device_type, timeframe, severity, etc.)
+- Data Query Agent semantically matches entities to tool-specific parameters
+- Mapping is implicit within agent logic based on tool parameter schemas
+- Entity `site` → maps to `site_id`, `assessment_scope`, or `location` depending on tool
+- Entity `timeframe` → transforms to `lookback_days`, `start_date`/`end_date`, or date range
+
+**Rationale for Current Approach:**
+- Flexible: Agent adapts to different tool schemas
+- No maintenance of static mapping tables
+- Agent applies context-aware transformations
+- Semantic understanding rather than rigid rules
+
+**Potential Issues:**
+- Inconsistent mapping across different tools
+- Difficult to debug when entity doesn't map correctly
+- No explicit documentation of supported entity-parameter combinations
+- Hard to validate entity coverage for new tools
+- Ambiguity when multiple parameters could match same entity
+
+**Future Consideration:**
+- **Option A: Explicit Mapping Registry**
+  - Maintain declarative mapping table: entity type → tool parameter mappings
+  - Define priority rules when multiple parameters match
+  - Document supported entity types per tool
+  - Validation: Check if all tool parameters can be satisfied by available entity types
+  
+- **Option B: Hybrid Approach**
+  - Maintain explicit mappings for common patterns
+  - Fall back to semantic matching for edge cases
+  - Document both explicit mappings and semantic rules
+  
+- **Option C: Tool Schema Annotation**
+  - Annotate tool schemas with entity type hints
+  - Example: `assessment_id (entity: assessment_id, required: true)`
+  - Agent uses annotations to guide mapping
+  - Formalize relationship between entities and parameters in tool definitions
+
+**Trade-offs:**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Current (Semantic)** | Flexible, no maintenance, adapts to new tools | Opaque logic, potential inconsistency, hard to debug |
+| **Explicit Registry** | Clear documentation, consistent, validatable | Maintenance overhead, rigid, doesn't adapt to new patterns |
+| **Hybrid** | Balance flexibility and predictability | More complex, need clear rules for which approach when |
+| **Schema Annotations** | Self-documenting tools, validation at tool level | Requires tool schema modifications, tooling support needed |
+
+**May Need Revision When:**
+- Adding many new MCP tools (consistency becomes critical)
+- Debugging entity mapping failures frequently
+- Need to validate entity coverage before tool invocation
+- Supporting user-defined tools (no semantic knowledge)
+- Building entity extraction validation pipeline
+
+---
+
+### 10. Schema and Ontology Management for SQL Path
+**Status:** Conceptual definition, implementation details undefined
+
+**Current Behavior:**
+- Data Query Agent SQL Path references `STATE.schema` (database structure) and `STATE.ontology` (data semantics)
+- Agent contract assumes these are available but doesn't specify how they're populated
+- Two-layer approach: structural schema (HOW to query) + semantic ontology (WHAT the data means)
+
+**Missing Specifications:**
+- **Schema Source**: Pre-loaded static config, dynamic discovery via information_schema, or hybrid?
+- **Ontology Format**: What structure for semantic data dictionary (table/column descriptions, value enumerations)?
+- **Schema Scope**: Single database or multi-database support?
+- **Schema Updates**: How to handle schema changes (versioning, refresh strategy)?
+- **Ontology Maintenance**: Who maintains semantic descriptions? Manual curation or auto-generated?
+- **Query Generation**: Text-to-SQL approach (LLM-based with schema+ontology context, template-based, or hybrid)?
+
+**Current Assumptions:**
+- `STATE.schema` contains table structures, columns, types, constraints, relationships
+- `STATE.ontology` contains semantic meanings:
+  - Table descriptions (business purpose, what data represents)
+  - Column descriptions (semantic meaning, business context)
+  - Value enumerations (valid values and their meanings)
+  - Entity-to-column mappings (e.g., `site` entity → `configs.site_id` column)
+  - Business rules and data relationships
+- Agent combines both to understand user intent and generate semantically correct SQL queries
+
+**Architectural Questions:**
+
+1. **Who populates STATE.schema and STATE.ontology?**
+   - Option A: Pre-loaded at system initialization (static configuration)
+   - Option B: Data Query Agent retrieves on first SQL Path invocation
+   - Option C: Knowledge Agent provides as part of enterprise context
+   - Option D: Separate Schema Service populates STATE before agents run
+
+2. **Schema Retrieval Strategy:**
+   - Option A: Full schema loaded upfront (complete database catalog)
+   - Option B: On-demand schema retrieval (query information_schema per request)
+   - Option C: Lazy loading with caching (retrieve first time, cache for session)
+   - Option D: Pre-indexed schema metadata service
+
+3. **Ontology Structure:**
+   - Option A: Declarative data dictionary (JSON/YAML with table/column descriptions and value enumerations)
+   - Option B: Embedded in database metadata (column comments, table descriptions, extended properties)
+   - Option C: Separate ontology service with versioning and rich semantic metadata
+   - Option D: LLM-inferred semantics from schema introspection and sample data analysis
+
+4. **Query Generation Approach:**
+   - Option A: LLM-based text-to-SQL (flexible, requires prompting)
+   - Option B: Template-based with parameter substitution (deterministic, limited)
+   - Option C: Query builder DSL (programmatic, type-safe)
+   - Option D: Hybrid (templates for common patterns, LLM for complex cases)
+
+**Trade-offs:**
+
+| Aspect | Pre-loaded Schema | Dynamic Schema | Ontology Service |
+|--------|-------------------|----------------|------------------|
+| **Latency** | Fastest (no retrieval) | Slower (query metadata) | Medium (service call) |
+| **Freshness** | May be stale | Always current | Depends on sync |
+| **Complexity** | Simple agent, complex setup | Complex agent, simple setup | Complex architecture |
+| **Adaptability** | Requires reconfig for changes | Auto-adapts to changes | Versioned, controlled |
+
+**Implications:**
+- Without ontology, agent cannot understand what data means (e.g., that category='security' represents security findings)
+- Without ontology, agent cannot map user entities to appropriate database columns
+- Without schema, agent cannot generate syntactically valid SQL
+- Query generation quality depends heavily on ontology completeness and accuracy
+- Rich semantic descriptions enable better intent-to-query translation
+- Schema changes can break queries if not versioned/validated
+
+**Future Considerations:**
+- Define STATE.schema and STATE.ontology formal structures
+- Specify schema population mechanism (pre-load, dynamic, service)
+- Choose ontology format (declarative dictionary, embedded metadata, service, LLM-inferred)
+- Choose query generation approach (LLM with schema+ontology context, templates, DSL, hybrid)
+- Implement schema versioning and change management
+- Add ontology maintenance workflow (manual curation, auto-generation from DB, LLM analysis)
+- Define semantic richness requirements (minimal descriptions vs comprehensive data dictionary)
+- Consider multiple database support (different schemas, dialects, ontologies)
+- Define fallback behavior when schema/ontology incomplete
+- Standardize value enumeration format for categorical columns
+
+**Related Decisions:**
+- Relates to Caveat #9 (entity-to-parameter mapping for MCP tools)
+- Both MCP Path and SQL Path need semantic understanding of entities and data
+- Ontology provides the semantic layer connecting user intent to data structures
+- Could unify entity semantic understanding across both paths
+
+---
+
 ## Architecture Decisions for Future Review
 
 ### 1. Planner as Pure Translator

@@ -193,6 +193,51 @@ This section shows complete examples of what the Intent Classifier writes to STA
 - Examples of valid entities: `site="Site-A"`, `environment="production"`, `output_format="summary_top_5"`
 - Examples of INVALID entities: `data_source="assessment_summary"`, `tool="get_assessment_summary"`, `database="trino_db"`
 
+### Entity Extraction Conventions
+
+Intent Classifier extracts **generic, semantic entity types** that are tool-agnostic. The Data Query Agent later maps these to specific tool parameters.
+
+**Standard Entity Types:**
+
+| Entity Type | Description | Example Values | Used By |
+|-------------|-------------|----------------|----------|
+| `site` | Physical location or site identifier | "DataCenter-1", "HQ", "Branch-05" | Data Query Agent (maps to `site_id`, `location`) |
+| `device` | Specific device identifier | "FW-01", "RTR-CORE-1" | Data Query Agent (maps to `device_id`, `hostname`) |
+| `device_type` | Device category | "firewall", "router", "switch" | Data Query Agent (maps to `device_type`, `platform`) |
+| `asset_target` | General asset scope | "network_devices", "security_appliances" | Data Query Agent (maps to query scope) |
+| `environment` | Deployment environment | "production", "staging", "dev" | Data Query Agent (maps to `environment`, `scope`) |
+| `timeframe` | Time reference | "last_7_days", "last_month", "Q1_2026" | Data Query Agent (maps to `lookback_days`, `start_date`, `end_date`) |
+| `assessment_type` | Type of assessment requested | "configuration_best_practice", "vulnerability_scan" | Planner (determines agent routing) |
+| `assessment_id` | Specific assessment identifier | "ASSESS-2026-001" | Data Query Agent (maps to `assessment_id` parameter) |
+| `severity` | Severity level | "critical", "high", "medium", "low" | Data Query Agent (maps to `severity_filter`) |
+| `ip_address` | IP address | "10.0.0.1", "192.168.1.0/24" | Data Query Agent (maps to `ip`, `subnet`) |
+| `vlan` | VLAN identifier | "100", "VLAN-PROD" | Data Query Agent (maps to `vlan_id`) |
+| `output_format` | Desired output format | "summary_top_5", "detailed_report" | Presentation logic (not passed to tools) |
+| `priority` | Urgency/priority level | "high", "critical", "normal" | Data Query Agent (maps to `priority` filter) |
+
+**Separation of Concerns:**
+- **Intent Classifier**: Extracts WHAT (semantic entities from user language)
+- **Data Query Agent**: Determines HOW (maps entities to tool-specific parameters)
+- **Planner**: Orchestrates WHO (routes to appropriate agents)
+
+**Example Entity Extraction:**
+```
+User: "Show me critical security issues from last week at DataCenter-1"
+
+Entities extracted:
+[
+  {"type": "severity", "value": "critical", "confidence": 1.0},
+  {"type": "timeframe", "value": "last_week", "confidence": 0.95},
+  {"type": "site", "value": "DataCenter-1", "confidence": 1.0},
+  {"type": "assessment_type", "value": "security_issues", "confidence": 0.90}
+]
+
+→ Data Query Agent later maps:
+  - severity → severity_filter: "critical"
+  - timeframe → lookback_days: 7
+  - site → site_id: "DataCenter-1"
+```
+
 **confidence**: Overall 0.0-1.0 score for classification quality. Use:
 - `0.9-1.0`: Clear, unambiguous intent
 - `0.7-0.9`: Good intent with minor gaps
