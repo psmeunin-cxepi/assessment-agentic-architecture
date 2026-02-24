@@ -1,0 +1,648 @@
+{
+  "_metadata": {
+    "description": "Initial evaluation dataset for the Assessment Agentic AI framework. Each entry represents a user prompt with expected classification, routing, and output expectations.",
+    "source": "CXP-17653 (JIRA) pre-seeded queries + supplemental prompts for full intent_class coverage",
+    "version": "1.0.0",
+    "created": "2026-02-24",
+    "intent_classes_covered": [
+      "cbp_assessment",
+      "cbp_expert_insights",
+      "cbp_generic",
+      "security_assessment",
+      "unknown_or_needs_clarification"
+    ],
+    "categories": [
+      "summary",
+      "statistics",
+      "risk_prioritization",
+      "corrective_actions",
+      "product_family_breakdown",
+      "technology_breakdown",
+      "asset_criticality_breakdown",
+      "trend_delta",
+      "persistent_issues",
+      "chart_visualization",
+      "out_of_scope",
+      "expert_insights",
+      "generic_knowledge",
+      "security_posture",
+      "ambiguous"
+    ]
+  },
+  "eval_cases": [
+    {
+      "id": "EVAL-001",
+      "source": "CXP-17653",
+      "category": "summary",
+      "user_prompt": "Can you provide a summary of my recent Configuration Best Practice assessment?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "timeframe", "value": "recent"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Core summary query. DQA fetches latest assessment via assessment_analysis_tool; CBP produces narrative summary."
+    },
+    {
+      "id": "EVAL-002",
+      "source": "CXP-17653",
+      "category": "statistics",
+      "user_prompt": "How many configuration best practice checks were performed in the latest assessment, and how many of those checks failed?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.9,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "timeframe", "value": "latest"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Statistical query — checks performed vs failed. CBP computes counts from assessment_context."
+    },
+    {
+      "id": "EVAL-003",
+      "source": "CXP-17653",
+      "category": "statistics",
+      "user_prompt": "How many assets were evaluated in this assessment, and what percentage of them are considered at risk?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.9,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Statistical query — asset count and % at risk. CBP derives percentage from assessment_context."
+    },
+    {
+      "id": "EVAL-004",
+      "source": "CXP-17653",
+      "category": "risk_prioritization",
+      "user_prompt": "What are the most common configuration deviations across my network?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "asset_target", "value": "network"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Findings ranked by frequency. CBP groups and counts deviations from assessment_context."
+    },
+    {
+      "id": "EVAL-005",
+      "source": "CXP-17653",
+      "category": "product_family_breakdown",
+      "user_prompt": "Which Cisco product families have the most deviations from configuration best practices?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary", "chart_hints"],
+        "chart_hints_expected": true,
+        "clarification_question": null
+      },
+      "notes": "Product family breakdown — grouped by product family. CBP produces chart_hints (bar chart) from product_family data in assessment_context."
+    },
+    {
+      "id": "EVAL-006",
+      "source": "CXP-17653",
+      "category": "technology_breakdown",
+      "user_prompt": "Which areas have the most deviations from configuration standards?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.8,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary", "chart_hints"],
+        "chart_hints_expected": true,
+        "clarification_question": null
+      },
+      "notes": "Technology/area breakdown. 'Areas' is intentionally vague — CBP interprets as technology areas from assessment_context."
+    },
+    {
+      "id": "EVAL-007",
+      "source": "CXP-17653",
+      "category": "risk_prioritization",
+      "user_prompt": "What deviations from best practice rules pose the highest risk to my network?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.9,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "severity", "value": "high"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["prioritized_risks", "findings"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Risk prioritization query. CBP produces prioritized_risks[] sorted by severity and confidence."
+    },
+    {
+      "id": "EVAL-008",
+      "source": "CXP-17653",
+      "category": "corrective_actions",
+      "user_prompt": "What corrective actions are recommended?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Remediation-focused. CBP populates finding.recommendation fields with actionable corrective actions."
+    },
+    {
+      "id": "EVAL-009",
+      "source": "CXP-17653",
+      "category": "risk_prioritization",
+      "user_prompt": "Which assets show maximum critical configuration deviations?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "severity", "value": "critical"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "prioritized_risks"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Asset-level risk ranking filtered to critical severity. CBP groups findings by asset and sorts by deviation count."
+    },
+    {
+      "id": "EVAL-010",
+      "source": "CXP-17653",
+      "category": "asset_criticality_breakdown",
+      "user_prompt": "Provide a breakdown of critical configuration deviations by asset criticality.",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "severity", "value": "critical"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary", "chart_hints"],
+        "chart_hints_expected": true,
+        "clarification_question": null
+      },
+      "notes": "Asset criticality breakdown. CBP groups critical deviations by asset criticality tier and produces chart_hints."
+    },
+    {
+      "id": "EVAL-011",
+      "source": "CXP-17653",
+      "category": "trend_delta",
+      "user_prompt": "What has changed since my last assessment?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "timeframe", "value": "since_last_assessment"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_comparison_tool"],
+        "expected_outputs": ["summary", "asset_trend", "findings"],
+        "chart_hints_expected": false,
+        "trend_mode": true,
+        "clarification_question": null
+      },
+      "notes": "Trend/delta query. DQA uses assessment_comparison_tool. CBP activates TREND mode — findings get delta_status, resolved items in summary narrative only."
+    },
+    {
+      "id": "EVAL-012",
+      "source": "CXP-17653",
+      "category": "trend_delta",
+      "user_prompt": "Which assets have improved or worsened since the previous assessment?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "timeframe", "value": "since_previous_assessment"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_comparison_tool"],
+        "expected_outputs": ["asset_trend", "summary"],
+        "chart_hints_expected": false,
+        "trend_mode": true,
+        "clarification_question": null
+      },
+      "notes": "Asset-level trend. CBP produces asset_trend[] with direction (improved/worsened) and issues_delta per asset."
+    },
+    {
+      "id": "EVAL-013",
+      "source": "CXP-17653",
+      "category": "persistent_issues",
+      "user_prompt": "Which critical best practice deviations remain open from the prior assessment?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "severity", "value": "critical"},
+          {"type": "timeframe", "value": "since_prior_assessment"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["issue_tracking_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "trend_mode": true,
+        "clarification_question": null
+      },
+      "notes": "Persistent issues filtered to critical. DQA uses issue_tracking_tool. CBP filters findings with delta_status='persistent' and severity='critical'."
+    },
+    {
+      "id": "EVAL-014",
+      "source": "CXP-17653",
+      "category": "chart_visualization",
+      "user_prompt": "Show breakdown of configuration best practice rules deviations by severity, technology, and OS.",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "output_format", "value": "chart"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary", "chart_hints"],
+        "chart_hints_expected": true,
+        "clarification_question": null
+      },
+      "notes": "Multi-dimension chart request. CBP produces multiple chart_hints[] entries (severity bar, technology bar, OS bar). JIRA notes bar-chart view."
+    },
+    {
+      "id": "EVAL-015",
+      "source": "CXP-17653",
+      "category": "out_of_scope",
+      "user_prompt": "Can I download a summary report?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.7,
+        "entities": [
+          {"type": "output_format", "value": "downloadable_report"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Export is a UI/platform concern — out of scope for the agent. CBP should produce the summary content and note that download/export is handled by the UI layer."
+    },
+
+    {
+      "id": "EVAL-016",
+      "source": "supplemental",
+      "category": "expert_insights",
+      "user_prompt": "What do the SLIC findings mean for my DataCenter-1 site given our internal policies?",
+      "expected": {
+        "intent_class": "cbp_expert_insights",
+        "confidence_min": 0.8,
+        "entities": [
+          {"type": "site", "value": "DataCenter-1"},
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Knowledge Agent", "Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Expert insights — requires SLIC data enriched with enterprise knowledge. Both DQA and KA are invoked. CBP skill: cbp_expert_insights."
+    },
+    {
+      "id": "EVAL-017",
+      "source": "supplemental",
+      "category": "expert_insights",
+      "user_prompt": "Explain the critical SLIC findings and how they relate to our approved configuration standards.",
+      "expected": {
+        "intent_class": "cbp_expert_insights",
+        "confidence_min": 0.8,
+        "entities": [
+          {"type": "severity", "value": "critical"}
+        ],
+        "agents_invoked": ["Knowledge Agent", "Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Expert insights with explicit SLIC + 'our standards' signals. KA retrieves enterprise standards; CBP enriches SLIC findings."
+    },
+    {
+      "id": "EVAL-018",
+      "source": "supplemental",
+      "category": "generic_knowledge",
+      "user_prompt": "What is the best practice for configuring BGP route filtering on Cisco routers?",
+      "expected": {
+        "intent_class": "cbp_generic",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "device_type", "value": "router"},
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Knowledge Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": [],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Generic knowledge query — no assessment data needed. KA retrieves enterprise knowledge; CBP produces summary from enterprise_context only. DQA not invoked."
+    },
+    {
+      "id": "EVAL-019",
+      "source": "supplemental",
+      "category": "generic_knowledge",
+      "user_prompt": "Why is NTP authentication flagged as a best practice deviation?",
+      "expected": {
+        "intent_class": "cbp_generic",
+        "confidence_min": 0.8,
+        "entities": [],
+        "agents_invoked": ["Knowledge Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": [],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Explanation query — 'why is this flagged?'. Linguistic signal for cbp_generic. KA provides enterprise/industry knowledge; CBP explains."
+    },
+    {
+      "id": "EVAL-020",
+      "source": "supplemental",
+      "category": "generic_knowledge",
+      "user_prompt": "How should I configure SNMP v3 according to our company standards?",
+      "expected": {
+        "intent_class": "cbp_generic",
+        "confidence_min": 0.85,
+        "entities": [],
+        "agents_invoked": ["Knowledge Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": [],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "How-to query with 'our company standards' signal. cbp_generic skill — KA retrieves enterprise standards, CBP formulates guidance."
+    },
+    {
+      "id": "EVAL-021",
+      "source": "supplemental",
+      "category": "security_posture",
+      "user_prompt": "Assess the security posture of our DataCenter-1 infrastructure.",
+      "expected": {
+        "intent_class": "security_assessment",
+        "confidence_min": 0.9,
+        "entities": [
+          {"type": "site", "value": "DataCenter-1"}
+        ],
+        "agents_invoked": ["Knowledge Agent", "Data Query Agent", "Security Assessment Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary", "prioritized_risks"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Security assessment with site scope. Routes to Security Assessment Agent. KA conditional (enterprise security context)."
+    },
+    {
+      "id": "EVAL-022",
+      "source": "supplemental",
+      "category": "security_posture",
+      "user_prompt": "Are there any insecure configurations or missing hardening controls on our firewalls?",
+      "expected": {
+        "intent_class": "security_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "device_type", "value": "firewall"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Security Assessment Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Security assessment scoped to firewalls. Clear security intent signal ('insecure', 'hardening')."
+    },
+    {
+      "id": "EVAL-023",
+      "source": "supplemental",
+      "category": "ambiguous",
+      "user_prompt": "Tell me about my network.",
+      "expected": {
+        "intent_class": "unknown_or_needs_clarification",
+        "confidence_min": 0.0,
+        "confidence_max": 0.5,
+        "entities": [],
+        "agents_invoked": [],
+        "knowledge_agent_needed": false,
+        "mcp_tools": [],
+        "expected_outputs": [],
+        "chart_hints_expected": false,
+        "clarification_question": "non-null — should ask what kind of information the user wants (assessment summary, security posture, configuration best practices, etc.)"
+      },
+      "notes": "Ambiguous prompt — no clear intent_class. IC should set unknown_or_needs_clarification and generate clarification_question. Graph short-circuits."
+    },
+    {
+      "id": "EVAL-024",
+      "source": "supplemental",
+      "category": "ambiguous",
+      "user_prompt": "Help.",
+      "expected": {
+        "intent_class": "unknown_or_needs_clarification",
+        "confidence_min": 0.0,
+        "confidence_max": 0.5,
+        "entities": [],
+        "agents_invoked": [],
+        "knowledge_agent_needed": false,
+        "mcp_tools": [],
+        "expected_outputs": [],
+        "chart_hints_expected": false,
+        "clarification_question": "non-null — should offer guidance on what the user can ask about (configuration assessment, security, trends, etc.)"
+      },
+      "notes": "Minimal input — triggers clarification gate. No agents invoked beyond IC."
+    },
+    {
+      "id": "EVAL-025",
+      "source": "supplemental",
+      "category": "ambiguous",
+      "user_prompt": "What about security?",
+      "expected": {
+        "intent_class": "unknown_or_needs_clarification",
+        "confidence_min": 0.0,
+        "confidence_max": 0.5,
+        "entities": [],
+        "agents_invoked": [],
+        "knowledge_agent_needed": false,
+        "mcp_tools": [],
+        "expected_outputs": [],
+        "chart_hints_expected": false,
+        "clarification_question": "non-null — should ask what the user wants to know about security (posture assessment, specific devices, hardening controls, etc.)"
+      },
+      "notes": "Vague follow-up-style prompt without conversation history. Insufficient for confident routing to security_assessment. Triggers clarification."
+    },
+    {
+      "id": "EVAL-026",
+      "source": "supplemental",
+      "category": "summary",
+      "user_prompt": "Give me a summary of configuration assessment findings for the HQ site.",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.9,
+        "entities": [
+          {"type": "site", "value": "HQ"},
+          {"type": "assessment_type", "value": "configuration_best_practice"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary", "findings"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Site-scoped summary. DQA passes site entity to assessment_analysis_tool. CBP filters findings to HQ."
+    },
+    {
+      "id": "EVAL-027",
+      "source": "supplemental",
+      "category": "statistics",
+      "user_prompt": "What percentage of my production routers have critical configuration deviations?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "environment", "value": "production"},
+          {"type": "device_type", "value": "router"},
+          {"type": "severity", "value": "critical"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Multi-entity statistical query. Tests entity extraction for environment + device_type + severity."
+    },
+    {
+      "id": "EVAL-028",
+      "source": "supplemental",
+      "category": "trend_delta",
+      "user_prompt": "Show me a trend of configuration deviations over the last 3 assessments.",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.8,
+        "entities": [
+          {"type": "assessment_type", "value": "configuration_best_practice"},
+          {"type": "timeframe", "value": "last_3_assessments"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_comparison_tool"],
+        "expected_outputs": ["summary", "asset_trend", "chart_hints"],
+        "chart_hints_expected": true,
+        "trend_mode": true,
+        "clarification_question": null
+      },
+      "notes": "Multi-assessment trend with chart expectation. DQA uses assessment_comparison_tool. CBP produces trend series chart_hints."
+    },
+    {
+      "id": "EVAL-029",
+      "source": "supplemental",
+      "category": "corrective_actions",
+      "user_prompt": "What specific configuration changes should I make to fix the critical deviations on RTR-CORE-1?",
+      "expected": {
+        "intent_class": "cbp_assessment",
+        "confidence_min": 0.85,
+        "entities": [
+          {"type": "device", "value": "RTR-CORE-1"},
+          {"type": "severity", "value": "critical"}
+        ],
+        "agents_invoked": ["Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": false,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Device-specific remediation. Tests device entity extraction and CBP recommendation generation with specific config commands."
+    },
+    {
+      "id": "EVAL-030",
+      "source": "supplemental",
+      "category": "expert_insights",
+      "user_prompt": "Are any of the SLIC findings impacting our PCI-DSS compliance?",
+      "expected": {
+        "intent_class": "cbp_expert_insights",
+        "confidence_min": 0.8,
+        "entities": [],
+        "agents_invoked": ["Knowledge Agent", "Data Query Agent", "Config Best Practice Agent"],
+        "knowledge_agent_needed": true,
+        "mcp_tools": ["assessment_analysis_tool"],
+        "expected_outputs": ["findings", "summary"],
+        "chart_hints_expected": false,
+        "clarification_question": null
+      },
+      "notes": "Expert insights — SLIC data + enterprise compliance knowledge (PCI-DSS). KA retrieves compliance policies; CBP maps SLIC findings to compliance impact."
+    }
+  ]
+}

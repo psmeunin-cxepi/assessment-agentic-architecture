@@ -32,23 +32,15 @@ Maintain and evolve a single shared object called `STATE` with ONLY these top-le
 - `intent`: { `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` }
 - `plan`: { `tasks[]`, `routing[]` }
   - Each task has: `{ id, owner, depends_on[], required_data[], status, outputs: {} }`
-  - Agent outputs written to `tasks[].outputs`:
-    - Knowledge Agent writes: `outputs.enterprise_context` (RAG chunks: `{retrieved_chunks: [], query_used}`)
-    - Data Query Agent writes: `outputs.assessment_context` (MCP or SQL data)
-    - Domain Agents write: `outputs.findings[]`, `outputs.summary`, `outputs.prioritized_risks[]`, `outputs.asset_trend[]` (trend mode), `outputs.chart_hints[]` (optional)
+  - Agent outputs written to `tasks[].outputs` (see individual agent contracts for field names)
 - `routing`: { `last_decision` }
 - `schema`: { `dialect`, `tables[]`, `columns[]`, `relationships[]` } (for SQL Path)
 - `ontology`: { `tables: {...}` } (semantic metadata for SQL Path - table/column meanings, value enumerations)
 - `trace`: { `node_run_order[]`, `state_deltas[]` }
+- `conversation`: { `history[]` } (future: multi-turn context; not populated in Phase 1)
 
 ### Deprecated STATE keys (do NOT use)
-- ❌ `plan.required_data[]` (now embedded in each task object)
-- ❌ `data.*` (replaced by task outputs)
-- ❌ `knowledge.*` (replaced by task outputs)
-- ❌ `findings.*` (replaced by task outputs)
-- ❌ `mcp.*` (replaced by Data Query Agent logic)
-- ❌ `sql.*` (replaced by Data Query Agent logic)
-- ❌ `final.*` (outcomes in task outputs)
+All agent outputs MUST live in `tasks[].outputs`. Legacy top-level keys are deprecated: `plan.required_data[]`, `data.*`, `knowledge.*`, `findings.*`, `mcp.*`, `sql.*`, `final.*`.
 
 ### State rules
 - Do not invent new keys outside the contract.
@@ -58,27 +50,22 @@ Maintain and evolve a single shared object called `STATE` with ONLY these top-le
 - Every node MUST append a concise entry to `trace.state_deltas[]` describing what changed.
 
 ## Data Query Agent Tooling
-Data Query Agent handles all data retrieval via MCP tools or SQL queries:
-- **MCP Path**: Invokes assessment API tools, writes results to `task.outputs.assessment_context`
-- **SQL Path**: Generates SQL queries using `STATE.schema` + `STATE.ontology`, writes results to `task.outputs.assessment_context`
-- **Anti-hallucination**: Do not fabricate tool results or query outputs - use `unknown` or `not_provided` if data is unavailable
+Data Query Agent retrieves data via two paths (full contract: `agents/04_data_query_agent.md`; tool contracts: [`tools/mcp/`](tools/mcp/)):
+- **MCP Path**: Invokes `assessment_analysis_tool`, `assessment_comparison_tool`, or `issue_tracking_tool`; writes results to `task.outputs.assessment_context`
+- **SQL Path**: Generates read-only SQL using `STATE.schema` + `STATE.ontology`; writes results to `task.outputs.assessment_context`
 
 ## Knowledge Agent Strategy
-Knowledge Agent provides enterprise context retrieval according to `graph/graph_flow.md`:
-- **Current scope**: Enterprise knowledge retrieval (RAG chunks containing all enterprise knowledge across supported domains)
+Knowledge Agent provides enterprise context retrieval (full contract: `agents/03_knowledge_agent.md`):
+- **Current scope**: Scoped RAG chunks (policies, standards, known exceptions, organizational context)
 - **Future scope (Phase 2)**: Assessment strategy planning
-- Outputs to `tasks[].outputs.enterprise_context` as: `{retrieved_chunks: [{content, metadata}], query_used}`
-- Invoked conditionally when user query requires enterprise context interpretation
+- Outputs to `tasks[].outputs.enterprise_context` as `{retrieved_chunks: [{content, metadata}], query_used}`
+
+## Anti-hallucination rule
+Do not fabricate MCP tool results, SQL query outputs, or RAG chunks — use `unknown` if data is unavailable.
 
 ## Execution policy (deterministic; aligns with graph/graph_flow.md)
-- **Clarification gate (pre-Planner)**:
-  - If Intent Classifier sets `intent_class` to `unknown_or_needs_clarification` (confidence < 0.5), `STATE.intent.clarification_question` is returned to the user
-  - Graph short-circuits: Planner does NOT run; no tasks are created
-  - User's reply re-enters the graph as a new `user_prompt`
-- **Single-pass plan/execute** (no replanning in current implementation):
-  - Planner creates complete task plan with dependencies
-  - Tasks execute once in dependency order
-  - Agents handle data gaps with assumptions and confidence scores
+- **Clarification gate (pre-Planner)**: If `intent_class == "unknown_or_needs_clarification"` (confidence < 0.5), return `STATE.intent.clarification_question` to the user. Graph short-circuits — Planner does NOT run; no tasks are created. User's reply re-enters as a new `user_prompt`.
+- **Single-pass plan/execute**: Planner creates complete task plan; tasks execute once in dependency order; agents handle data gaps with assumptions and confidence scores.
 - **Conditional agent invocation per intent_class**:
 
   | intent_class | Domain Agent | Data Query Agent | Knowledge Agent |
@@ -88,22 +75,18 @@ Knowledge Agent provides enterprise context retrieval according to `graph/graph_
   | `cbp_generic` | Config Best Practice Agent | Never | Always |
   | `security_assessment` | Security Assessment Agent | Conditional | Conditional |
 
-- Execution order follows:
-  1) Intent Classifier → extracts `intent_class` and `entities[]`
-     - If `intent_class == "unknown_or_needs_clarification"` → return `clarification_question` to user (short-circuit; skip steps 2–6)
-  2) Planner → creates conditional task plan with dependencies
-  3) Knowledge Agent (if needed) → writes `task.outputs.enterprise_context`
-  4) Data Query Agent (if needed) → writes `task.outputs.assessment_context`
-  5) Domain Agents → read upstream task outputs, write `task.outputs.findings[]` or `task.outputs.summary`
-  6) Graph returns final STATE with all task outputs
+- **Execution order**: Intent Classifier → Planner → Knowledge Agent (if needed) → Data Query Agent (if needed) → Domain Agents → return final STATE
 
 ## Output required for EVERY user prompt
 
 ### 1) Intent Classification
 Provide:
 - `intent.intent_class` (single best classification)
+- `intent.meta_intent` (conversational-level intent: `new_topic`, `follow_up`, `clarification`)
+- `intent.domain_details` (structured assessment metadata: goal, scope, urgency)
 - `intent.entities[]` (semantic entities: site, device, timeframe, severity, etc.)
 - `intent.confidence` (0–1)
+- `intent.clarification_question` (populated only when `intent_class == "unknown_or_needs_clarification"`; `null` otherwise)
 
 ### 2) Graph Flow Map (Mermaid)
 Generate a Mermaid diagram (`flowchart TD`) reflecting the executed path.
@@ -118,19 +101,11 @@ For each executed node:
 - Exit Logic (task completion, next task based on dependencies)
 
 ### 4) Final Assessment Outcome
-Extract from task outputs:
-- Configuration findings: `tasks[].outputs.findings[]` (from Config Best Practice Agent)
-- Security findings: `tasks[].outputs.findings[]` (from Security Assessment Agent)
-- Prioritized risks: `tasks[].outputs.prioritized_risks[]`
-- Analysis summary: `tasks[].outputs.summary` (for query-based responses)
-- Asset trend: `tasks[].outputs.asset_trend[]` (for comparison/delta responses)
-- Chart hints: `tasks[].outputs.chart_hints[]` (signals chart-ready data for UI layer)
-- Data gaps and assumptions from individual findings
+Extract whatever domain agents wrote to `tasks[].outputs` (findings, summary, prioritized_risks, asset_trend, chart_hints, data_gaps, assumptions). Present organized by agent.
 
 ## Constraints
 - DO NOT provide LangGraph Python/TS code.
 - DO NOT introduce agents beyond those defined in the agent `.md` files.
 - DO NOT use SLIC Agent (removed from architecture). Note: SLIC *data* (findings in assessment_context) is valid input — the `cbp_expert_insights` skill consumes it. There is no separate SLIC Agent node.
 - Follow `graph/graph_flow.md` as the authoritative flow.
-- All agent outputs MUST be written to `tasks[].outputs`, not separate STATE sections.
 - Keep the trace concise but complete: prefer structured lists over long prose.
