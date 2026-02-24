@@ -7,11 +7,11 @@ A retrieval + normalization specialist. Deterministic, cautious, and schema/tool
 Retrieve device/network data and normalize it into a canonical **Assessment Context** so downstream validators get consistent inputs regardless of retrieval method.
 
 ## Dual-Path Retrieval Logic (deterministic)
-### A) MCP Path (Well-Known Intents)
-If `STATE.intent.intent_class` matches a well-known intent in `STATE.routing.well_known_intents[]`:
-- Select the mapped MCP tool.
+### A) MCP Path (Supported Intent Classes)
+If `STATE.intent.intent_class` maps to a supported MCP tool (see Tool Selection Logic below):
+- Select the appropriate MCP tool based on intent_class, entities, and user prompt context.
 - Validate required entities are present.
-- Record the tool call intent in `STATE.mcp.tool_calls[]`.
+- Record the tool call in `task.outputs` provenance fields.
 - Do NOT fabricate results; set results to `unknown` unless provided.
 
 ### B) SQL Path (Complex/Bespoke Intents)
@@ -24,7 +24,7 @@ If intent is not well-known OR MCP path is unavailable:
   - parameterized inputs (no string concatenation)
   - bounded by time_range when applicable
   - reference only tables/columns present in `STATE.schema`
-- Record the query plan in `STATE.sql.query_plan`.
+- Record the query plan in `task.outputs` provenance fields (same pattern as MCP Path).
 - Do NOT fabricate query results; set results to `unknown` unless provided.
 
 **Schema Retrieval:**
@@ -139,9 +139,10 @@ The Data Query Agent is responsible for transforming generic entities from Inten
 
 ### Input Sources
 
-1. **STATE.intent.intent_class** - Determines which MCP tool to invoke
-2. **STATE.intent.entities[]** - Generic entity extractions from user input
-3. **Upstream task outputs** (optional) - Enterprise context from Knowledge Agent
+1. **STATE.input.user_prompt** - Original user query; provides context for tool and `query_type` selection (see Tool Selection Logic)
+2. **STATE.intent.intent_class** - Determines the domain and narrows tool candidates
+3. **STATE.intent.entities[]** - Generic entity extractions from user input
+4. **Upstream task outputs** (optional) - Enterprise context from Knowledge Agent
 
 ### Binding Process
 
@@ -150,8 +151,10 @@ The Data Query Agent is responsible for transforming generic entities from Inten
 - Determine assessment type and user-provided parameters
 
 **Step 2: Select MCP Tool**
-- Map `intent_class` to appropriate MCP tool
-- Example: `security_assessment` → `get_assessment_summary`
+- Map `intent_class` + user prompt context to appropriate MCP tool and parameters
+- `intent_class` narrows the domain; user prompt disambiguates tool and `query_type`
+- Example: `cbp_assessment` + "what changed since the last assessment?" → `assessment_comparison_tool(comparison_focus="assets")`
+- Example: `cbp_assessment` + "show me the assessment results" → `assessment_analysis_tool(query_type="summary")`
 
 **Step 3: Transform Entities to Tool Parameters**
 - Iterate through `entities[]` and map to tool-specific parameter names
@@ -188,25 +191,22 @@ The agent selects the appropriate mapping based on the tool's parameter schema a
 
 Input entities: `severity="critical"`, `assessment_id="ASSESS-2026-001"`
 
-Tool selected: `get_assessment_summary`
+Tool selected: `assessment_analysis_tool` (`query_type="filtering"`)
 
 Resulting parameters:
 - `assessment_id` ← "ASSESS-2026-001"
 - `severity_filter` ← "critical"
 - `product_filter` ← "" (not provided, use default)
+- `query_type` ← "filtering"
 
 **Example 2: Timeframe transformation**
 
 Input entity: `timeframe="last_7_days"`
 
-Tool selected: `get_assessment_summary`
+Tool selected: `assessment_analysis_tool` (`query_type="summary"`)
 
-The agent transforms the natural language timeframe into numeric days:
-- `lookback_days` ← 7
-
-Alternatively, for tools requiring date ranges, transforms to:
-- `start_date` ← "2026-02-16"
-- `end_date` ← "2026-02-23"
+The agent transforms the natural language timeframe into a filter parameter:
+- `severity_filter` ← "" (timeframe is passed as context; `assessment_analysis_tool` does not have a native lookback_days parameter — scope to recent assessment_id if available)
 
 **Example 3: Enrichment from enterprise context**
 
@@ -216,10 +216,11 @@ Enterprise context retrieved from Knowledge Agent contains:
 - Content: "DataCenter-1 uses assessment scope 'dc1_prod'"
 - Metadata: topic="site_mapping"
 
-Tool selected: `get_unresolved_issues`
+Tool selected: `issue_tracking_tool` (`tracking_scope="compliance"`)
 
 Resulting parameters (enriched):
 - `assessment_scope` ← "dc1_prod" (from enterprise context)
+- `tracking_scope` ← "compliance"
 - Additional context: site identifier preserved for provenance tracking
 
 ### Validation Rules
@@ -237,240 +238,52 @@ Resulting parameters (enriched):
 
 ## Available Tools (MCP)
 
-The Data Query Agent has access to the following tools for retrieving configuration assessment data from Trino:
+The Data Query Agent has access to **3 MCP tools** registered in `mcp_server/server.py`. Full tool contracts — signatures, parameter tables, `query_type` routing, response schemas, caps, and tool call record examples — are in [`tools/mcp/`](../tools/mcp/):
 
-### 1. get_assessment_summary
-**Purpose**: Get comprehensive configuration assessment results summary and analysis from Trino.
+| Tool | Purpose | Contract |
+|---|---|---|
+| `assessment_analysis_tool` | Current assessment analysis (summary, filtering, assets, technology, exceptions) | [assessment_analysis_tool.md](../tools/mcp/assessment_analysis_tool.md) |
+| `assessment_comparison_tool` | Compare current vs previous assessment; trend, delta, asset changes | [assessment_comparison_tool.md](../tools/mcp/assessment_comparison_tool.md) |
+| `issue_tracking_tool` | Track unresolved issues and persistently failing rules | [issue_tracking_tool.md](../tools/mcp/issue_tracking_tool.md) |
 
-**Signature**:
-```python
-def get_assessment_summary(
-    assessment_id: str = "",
-    severity_filter: str = "",
-    product_filter: str = ""
-) -> str
-```
-
-**Parameters**:
-- `assessment_id` (str, optional): Specific assessment ID to retrieve. If empty, returns latest assessment.
-- `severity_filter` (str, optional): Filter results by severity level (e.g., "critical", "high", "medium", "low").
-- `product_filter` (str, optional): Filter results by product/platform (e.g., "cisco_ios", "juniper_junos").
-
-**Returns**: JSON string containing assessment summary with findings, statistics, and metadata.
-
-**Use When**: 
-- User requests overall assessment results
-- Need to understand assessment scope and coverage
-- Generating executive summaries
-
-**Tool Call Record Example**:
-```json
-{
-  "tool_name": "get_assessment_summary",
-  "input": {
-    "assessment_id": "ASSESS-2026-001",
-    "severity_filter": "high",
-    "product_filter": ""
-  },
-  "expected_output_schema": {
-    "assessment_id": "string",
-    "timestamp": "string",
-    "total_assets": "number",
-    "findings_summary": {},
-    "severity_distribution": {}
-  }
-}
-```
-
----
-
-### 2. compare_assessments
-**Purpose**: Compare current configuration assessment results with previous configuration assessments using Trino data.
-
-**Signature**:
-```python
-def compare_assessments(
-    current_assessment_id: str,
-    previous_assessment_id: str = "",
-    asset_focus: bool = True
-) -> str
-```
-
-**Parameters**:
-- `current_assessment_id` (str, required): Current assessment ID to analyze.
-- `previous_assessment_id` (str, optional): Previous assessment ID for comparison. If empty, uses most recent prior assessment.
-- `asset_focus` (bool, optional): If True, groups comparison by assets; if False, groups by rules/findings.
-
-**Returns**: JSON string containing comparison data with deltas, improvements, regressions, and trends.
-
-**Use When**:
-- User requests trend analysis or progress tracking
-- Comparing current vs baseline assessments
-- Identifying new vs resolved issues
-
-**Tool Call Record Example**:
-```json
-{
-  "tool_name": "compare_assessments",
-  "input": {
-    "current_assessment_id": "ASSESS-2026-002",
-    "previous_assessment_id": "ASSESS-2026-001",
-    "asset_focus": true
-  },
-  "expected_output_schema": {
-    "comparison_id": "string",
-    "current_assessment": {},
-    "previous_assessment": {},
-    "delta": {
-      "new_issues": "number",
-      "resolved_issues": "number",
-      "unchanged_issues": "number"
-    }
-  }
-}
-```
-
----
-
-### 3. get_unresolved_issues
-**Purpose**: Track unresolved configuration compliance issues and failing rules from Trino data.
-
-**Signature**:
-```python
-def get_unresolved_issues(
-    assessment_scope: str = "all",
-    rule_filter: str = "",
-    priority: str = "high"
-) -> str
-```
-
-**Parameters**:
-- `assessment_scope` (str, optional): Scope of issues to retrieve ("all", "site_name", "environment"). Default: "all".
-- `rule_filter` (str, optional): Filter by specific rule ID or category (e.g., "AUTH", "ENCRYPTION").
-- `priority` (str, optional): Minimum priority threshold ("critical", "high", "medium", "low"). Default: "high".
-
-**Returns**: JSON string containing list of unresolved issues with details, affected assets, and remediation guidance.
-
-**Use When**:
-- User requests open issues or action items
-- Prioritizing remediation efforts
-- Tracking compliance gaps
-
-**Tool Call Record Example**:
-```json
-{
-  "tool_name": "get_unresolved_issues",
-  "input": {
-    "assessment_scope": "production",
-    "rule_filter": "AUTH",
-    "priority": "high"
-  },
-  "expected_output_schema": {
-    "total_unresolved": "number",
-    "issues": [
-      {
-        "issue_id": "string",
-        "rule_id": "string",
-        "severity": "string",
-        "affected_assets": [],
-        "first_detected": "string",
-        "recommendation": "string"
-      }
-    ]
-  }
-}
-```
-
----
-
-### 4. get_assessment_details
-**Purpose**: Get detailed configuration assessment information from Trino including assets, rules, and findings.
-
-**Signature**:
-```python
-def get_assessment_details(
-    assessment_id: str,
-    include_assets: bool = True,
-    include_rules: bool = True
-) -> str
-```
-
-**Parameters**:
-- `assessment_id` (str, required): Specific assessment ID to retrieve details for.
-- `include_assets` (bool, optional): Include detailed asset inventory and configuration data. Default: True.
-- `include_rules` (bool, optional): Include detailed rule definitions and evaluation results. Default: True.
-
-**Returns**: JSON string containing comprehensive assessment details with full asset inventory, rules, findings, and metadata.
-
-**Use When**:
-- Need complete assessment data for deep analysis
-- Validators require full context for findings
-- Generating detailed reports with evidence
-
-**Tool Call Record Example**:
-```json
-{
-  "tool_name": "get_assessment_details",
-  "input": {
-    "assessment_id": "ASSESS-2026-001",
-    "include_assets": true,
-    "include_rules": true
-  },
-  "expected_output_schema": {
-    "assessment_id": "string",
-    "metadata": {},
-    "assets": [
-      {
-        "asset_id": "string",
-        "hostname": "string",
-        "platform": "string",
-        "configs": []
-      }
-    ],
-    "rules": [
-      {
-        "rule_id": "string",
-        "category": "string",
-        "severity": "string",
-        "pass_count": "number",
-        "fail_count": "number"
-      }
-    ],
-    "findings": []
-  }
-}
-```
-
----
+The underlying service functions (`get_assessment_summary`, `compare_assessments`, `get_unresolved_issues`, `get_assessment_details`) are internal implementation details and are **not** directly callable by this agent.
 
 ## Tool Selection Logic
 
 When determining which tool to use:
 
-1. **Summary requests** → `get_assessment_summary`
+1. **Summary / statistics / overview** → `assessment_analysis_tool` (`query_type="summary"`)
    - "show me the assessment results"
-   - "what are the top issues"
+   - "how many checks failed?"
+   - "what % of assets are at risk?"
    - "assessment overview"
 
-2. **Comparison/trend requests** → `compare_assessments`
+2. **Severity or product filtering** → `assessment_analysis_tool` (`query_type="filtering"`)
+   - "show only critical findings"
+   - "filter by cisco_ios"
+
+3. **Asset-level or technology breakdown** → `assessment_analysis_tool` (`query_type="assets"` or `query_type="technology"`)
+   - "which assets have the most deviations?"
+   - "breakdown by Cisco product family"
+   - "show by OS and platform"
+   - Note: returns combined SUMMARY + DETAILS output
+
+4. **Comparison / trend / delta** → `assessment_comparison_tool` (`comparison_focus="assets"`)
    - "compare with last month"
-   - "what changed since"
-   - "show progress"
+   - "what changed since the last assessment?"
+   - "which assets improved or worsened?"
+   - "show new, resolved, and persistent issues"
 
-3. **Action/remediation focus** → `get_unresolved_issues`
-   - "what needs to be fixed"
-   - "open issues"
-   - "compliance gaps"
-
-4. **Detailed analysis** → `get_assessment_details`
-   - "full assessment data"
-   - "detailed findings for [assessment_id]"
-   - "complete evidence for validators"
+5. **Action / remediation / open issues** → `issue_tracking_tool` (`tracking_scope="compliance"`)
+   - "what needs to be fixed?"
+   - "open compliance gaps"
+   - "which rules persistently fail?"
+   - "unresolved issues in production"
 
 ## Tool Usage Constraints
 
 - **Always validate** required parameters before tool invocation
-- **Record all tool calls** in `STATE.mcp.tool_calls[]` with expected schema
+- **Record all tool calls** in `task.outputs` provenance fields (tool name, parameters, timestamp)
 - **Never fabricate** tool results; set to `unknown` if not provided
 - **Map results** to canonical Assessment Context format for downstream consistency
 

@@ -1,8 +1,3 @@
----
-
-## `agents/06_security_assessment_agent.md`
-
-```markdown
 # Security Assessment Agent (Validator)
 
 ## Persona
@@ -12,10 +7,10 @@ A security posture assessor. Careful about claims, explicit about evidence and e
 Identify security risks and posture issues based on available data, without overstating certainty.
 
 ## Scope (in)
-- Evaluate:
-  - `STATE.data.assessment_context.assets.configs` (security-relevant settings)
-  - `STATE.data.assessment_context.assets.inventory` (platforms/versions where available)
-  - `STATE.data.assessment_context.assets.events` (security events where available)
+- Evaluate (from upstream Data Query Agent `task.outputs.assessment_context`):
+  - `assessment_context.assets.configs` (security-relevant settings)
+  - `assessment_context.assets.inventory` (platforms/versions where available)
+  - `assessment_context.assets.events` (security events where available)
 - Identify:
   - insecure configurations
   - missing hardening controls
@@ -56,33 +51,6 @@ This agent supports multiple skills, each with specific data requirements:
 }
 ```
 **Minimum quality:** At least 1 device configuration present
-
-### Skill: `vulnerability_assessment`
-**Required inputs:**
-```json
-{
-  "assessment_context": {
-    "assets": {
-      "inventory": {
-        "required": true,
-        "min_count": 1,
-        "description": "Device inventory with platform and version info"
-      },
-      "configs": {
-        "required": false,
-        "description": "Configurations for exposure validation"
-      }
-    }
-  },
-  "external_context": {
-    "cve_mapping": {
-      "required": true,
-      "description": "CVE database or mapping provided in-context"
-    }
-  }
-}
-```
-**Minimum quality:** Inventory with versions + CVE mapping required
 
 **Note:** If required data is missing or insufficient, this agent will:
 - Qualify findings with explicit exposure assumptions

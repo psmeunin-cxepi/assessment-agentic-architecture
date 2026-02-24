@@ -5,8 +5,7 @@ A deterministic orchestrator. Converts intent into an executable plan and routin
 
 ## Primary Objective
 Create and maintain:
-- `plan.tasks[]` (ordered)
-- `plan.required_data[]` (explicit data dependencies)
+- `plan.tasks[]` (ordered, with embedded data dependencies per task)
 - `plan.routing[]` (which agent handles what)
 and drive the graph until sufficient data exists for domain specialized agents.
 
@@ -52,16 +51,16 @@ Also append:
 ### How to Create a Plan
 
 **Step 1: Determine required tasks based on intent**
-- Read `STATE.intent.intent_class` (e.g., "configuration_assessment", "security_assessment")
+- Read `STATE.intent.intent_class` (e.g., `"cbp_assessment"`, `"security_assessment"`)
 - Determine which domain agent(s) perform this assessment
 - Determine if Knowledge Agent is needed for enterprise context (follow-ups, ambiguous queries, policy clarification)
 
 **Step 2: Map to appropriate domain agents**
 - Map `intent_class` to domain agent(s):
-  - `configuration_assessment` → Config Best Practice Agent
+  - `cbp_assessment` → Config Best Practice Agent (skill: `cbp_assessment`)
+  - `cbp_expert_insights` → Config Best Practice Agent (skill: `cbp_expert_insights`)
+  - `cbp_generic` → Config Best Practice Agent (skill: `cbp_generic`)
   - `security_assessment` → Security Assessment Agent
-  - `compliance_check` → Config Best Practice Agent (skill: compliance_check)
-  - `vulnerability_assessment` → Security Assessment Agent (skill: vulnerability_assessment)
 
 **Step 3: Load data dependencies from agent contracts**
 Each domain agent's contract contains a "Data Dependencies" section organized by skill/intent_class.
@@ -69,12 +68,11 @@ Extract the `required` fields for the matching skill.
 - If domain agent has data dependencies → Include Data Query Agent task
 
 **Example:**
-If `intent_class = "configuration_assessment"`:
+If `intent_class = "cbp_assessment"`:
 - Target agent: Config Best Practice Agent
-- Load skill: "configuration_assessment"
+- Load skill: `cbp_assessment`
 - Required data:
-  - `assessment_context.assets.configs` (required: true, min_count: 1)
-  - `assessment_context.assets.inventory` (required: false)
+  - `assessment_context` (required: true, min_count: 1)
 - Decision: Has required data → Include Data Query Agent task
 
 **Step 4: Populate `plan.tasks[]` with embedded data requirements**
@@ -88,16 +86,10 @@ Embed data requirements within each domain agent task:
   "depends_on": ["T2"],
   "required_data": [
     {
-      "data_path": "assessment_context.assets.configs",
-      "skill": "configuration_assessment",
+      "data_path": "assessment_context",
+      "skill": "cbp_assessment",
       "min_count": 1,
       "priority": "required"
-    },
-    {
-      "data_path": "assessment_context.assets.inventory",
-      "skill": "configuration_assessment",
-      "min_count": 0,
-      "priority": "optional"
     }
   ],
   "status": "pending"
@@ -130,8 +122,8 @@ For domain agent tasks that require data, embed `required_data[]`:
   "depends_on": ["T2"],
   "required_data": [
     {
-      "data_path": "assessment_context.assets.configs",
-      "skill": "configuration_assessment",
+      "data_path": "assessment_context",
+      "skill": "cbp_assessment",
       "min_count": 1,
       "priority": "required"
     }
@@ -169,12 +161,12 @@ START
 
 **Agent Mapping by Intent Class:**
 
-| Intent Class | Primary Agent | Secondary Agents |
-|---|---|---|
-| `configuration_assessment` | Config Best Practice Agent | Knowledge (if context needed), Data Query (if data dependencies exist) |
-| `compliance_check` | Config Best Practice Agent (skill: compliance_check) | Knowledge (for standard clarification), Data Query (if inventory required) |
-| `security_assessment` | Security Assessment Agent | Knowledge (if context needed), Data Query (if data dependencies exist) |
-| `vulnerability_assessment` | Security Assessment Agent (skill: vulnerability_assessment) | Data Query (if inventory+versions required) |
+| Intent Class | Primary Agent | Data Query Agent | Knowledge Agent |
+|---|---|---|---|
+| `cbp_assessment` | Config Best Practice Agent | Always (assessment data required) | Conditional (enterprise enrichment) |
+| `cbp_expert_insights` | Config Best Practice Agent | Always (SLIC data required) | Always (enterprise enrichment required) |
+| `cbp_generic` | Config Best Practice Agent | Never | Always (enterprise knowledge required) |
+| `security_assessment` | Security Assessment Agent | Conditional (if data dependencies exist) | Conditional (if context needed) |
 
 **Note:** Knowledge Agent provides enterprise context only; assessment strategy planning is future enhancement.
 
@@ -192,7 +184,7 @@ START
 ```json
 {
   "intent": {
-    "intent_class": "configuration_assessment",
+      "intent_class": "cbp_assessment",
     "entities": [{"type": "site", "value": "HQ"}]
   }
 }
@@ -226,16 +218,10 @@ START
         "depends_on": ["T2"],
         "required_data": [
           {
-            "data_path": "assessment_context.assets.configs",
-            "skill": "configuration_assessment",
+            "data_path": "assessment_context",
+            "skill": "cbp_assessment",
             "min_count": 1,
             "priority": "required"
-          },
-          {
-            "data_path": "assessment_context.assets.inventory",
-            "skill": "configuration_assessment",
-            "min_count": 0,
-            "priority": "optional"
           }
         ],
         "status": "pending",

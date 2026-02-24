@@ -1,0 +1,104 @@
+{
+  "name": "Planner",
+  "description": "Deterministic orchestrator that converts classified intent into an executable task plan. Constructs STATE.plan.tasks[] with embedded data requirements, maps tasks to agents, and drives conditional graph execution across Knowledge Agent, Data Query Agent, and domain specialized agents.",
+  "url": "https://placeholder.assessments.internal/agents/planner",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/planner",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "plan_cbp_assessment",
+      "name": "Plan CBP Assessment",
+      "description": "Generates an ordered task plan for a configuration best practice assessment (intent_class: cbp_assessment). Always includes Data Query Agent task (assessment data required). Conditionally includes Knowledge Agent task (if enterprise enrichment improves answer quality). Always includes Config Best Practice Agent task as the terminal domain agent with skill cbp_assessment.",
+      "tags": ["planning", "orchestration", "configuration", "assessment", "cbp"],
+      "examples": [
+        "What are the configuration issues at the HQ site?",
+        "Run a configuration best practice assessment for all edge devices.",
+        "Show me the configuration assessment results for DataCenter-1.",
+        "How many checks failed in the latest assessment?",
+        "What changed since the last assessment?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "plan_cbp_expert_insights",
+      "name": "Plan CBP Expert Insights",
+      "description": "Generates an ordered task plan for SLIC finding enrichment (intent_class: cbp_expert_insights). Always includes Data Query Agent task (SLIC data required) and Knowledge Agent task (enterprise knowledge required for enrichment). Always includes Config Best Practice Agent task as the terminal domain agent with skill cbp_expert_insights.",
+      "tags": ["planning", "orchestration", "configuration", "slic", "expert-insights", "cbp"],
+      "examples": [
+        "The latest assessment has SLIC findings for DataCenter-1 — what do the critical ones mean?",
+        "Explain SLIC findings and map them to our network policies.",
+        "What do these SLIC results say about our security posture?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "plan_cbp_generic",
+      "name": "Plan CBP Generic",
+      "description": "Generates an ordered task plan for a general configuration or best-practice question (intent_class: cbp_generic). Always includes Knowledge Agent task (enterprise knowledge required). Data Query Agent is NOT included — no assessment data needed. Always includes Config Best Practice Agent task as the terminal domain agent with skill cbp_generic.",
+      "tags": ["planning", "orchestration", "configuration", "best-practice", "generic", "cbp"],
+      "examples": [
+        "How should I configure BGP route filtering to follow best practices?",
+        "What does this rule mean?",
+        "What's the best practice for NTP configuration?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "plan_security_assessment",
+      "name": "Plan Security Assessment",
+      "description": "Generates an ordered task plan for a security posture assessment. Conditionally includes Knowledge Agent and Data Query Agent tasks. Always includes Security Assessment Agent as the terminal domain agent.",
+      "tags": ["planning", "orchestration", "security", "assessment"],
+      "examples": [
+        "Assess the security posture of DataCenter-1.",
+        "Run a security check across all production assets.",
+        "What are the top security risks for the branch offices?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "url, provider.url, and documentationUrl are placeholder values. Replace with real endpoints before implementation.",
+      "securitySchemes.bearerAuth is a placeholder. Replace with the actual scheme (OAuth2, OIDC, mTLS, ApiKey, etc.) at implementation time. See A2A spec section 4.5 Security Objects.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+      "Planner does not evaluate current STATE data availability - it declares requirements only. Sufficiency is evaluated by Data Query Agent and domain agents at execution time."
+    ]
+  }
+}

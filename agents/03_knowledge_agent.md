@@ -24,7 +24,7 @@ Formulate retrieval queries for RAG systems based on user intent and conversatio
 ## Inputs (STATE read)
 - `STATE.intent.*` (required: for query formulation)
 - `STATE.plan.*` (optional: for understanding assessment context)
-- `STATE.data.assessment_context` (optional: for interpreting partial observations)
+- Upstream Data Query Agent task outputs (optional: `task.outputs.assessment_context` for interpreting partial observations)
 - `STATE.conversation.history[]` (future: for follow-up query augmentation)
 
 ## Outputs (STATE write)
@@ -64,9 +64,9 @@ Formulate effective retrieval queries that capture:
 
 3. **Generic Queries**: Expand with domain context
    ```
-   Original: "How should I assess this?"
-   With intent: intent_class="compliance_check", entities=[{"standard": "PCI-DSS"}]
-   Augmented: "What is the recommended approach for PCI-DSS compliance assessment?"
+   Original: "How should I configure BGP route filtering?"
+   With intent: intent_class="cbp_generic", entities=[{"type": "assessment_type", "value": "configuration_best_practice"}]
+   Augmented: "What are BGP route filtering best practices and recommended enterprise configurations?"
    ```
 
 ### Retrieval Query Structure
@@ -111,7 +111,7 @@ Provides enterprise knowledge retrieved from RAG system as labeled chunks:
       "metadata": {
         "source": "exceptions/legacy_systems.md",
         "topic": "approved_exceptions",
-        "domain": "configuration_assessment",
+        "domain": "cbp_assessment",
         "relevance_score": 0.87,
         "timestamp": "2025-11-20"
       }
@@ -160,6 +160,6 @@ Future enhancement to provide assessment methodology and planning:
 
 ### Anti-Hallucination Rules
 - Only include information retrieved from knowledge base or present in STATE
-- Do not invent observed evidence (only reference what exists in `STATE.data.assessment_context`)
+- Do not invent observed evidence (only reference what exists in upstream Data Query Agent `task.outputs.assessment_context`)
 - Mark confidence level for retrieved information
 - Cite sources when providing enterprise context

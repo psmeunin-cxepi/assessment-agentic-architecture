@@ -1,0 +1,81 @@
+{
+  "name": "Knowledge Agent",
+  "description": "Domain strategist and explainer. Conditionally invoked by Planner when enterprise context is required. Formulates retrieval queries for RAG systems, retrieves enterprise knowledge (policies, standards, compliance requirements, known exceptions), and populates task-embedded outputs to guide domain specialized agents.",
+  "url": "https://placeholder.assessments.internal/agents/knowledge-agent",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/knowledge-agent",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "retrieve_enterprise_context",
+      "name": "Retrieve Enterprise Context",
+      "description": "Formulates a retrieval query from STATE.intent.* and conversation context, then retrieves relevant enterprise knowledge from the RAG system. Populates task.outputs.enterprise_context (policies, standards, known exceptions as labeled chunks) and task.outputs.retrieval_query (the formulated query for traceability). Used by domain specialized agents to interpret requirements and qualify findings against organizational standards.",
+      "tags": ["knowledge", "rag", "enterprise-context", "retrieval", "policies", "standards", "compliance"],
+      "examples": [
+        "What are the enterprise security standards applicable to DataCenter-1?",
+        "Retrieve relevant policies for a PCI-DSS compliance check.",
+        "What known exceptions apply to legacy systems during configuration assessment?",
+        "Fetch enterprise context for a vulnerability assessment on HQ network devices."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "plan_assessment_strategy",
+      "name": "Plan Assessment Strategy",
+      "description": "(Phase 2 — not yet active) Suggests data acquisition strategies and assessment planning guidance based on intent, scope, and enterprise context. Populates task.outputs.assessment_strategy with approach, focus areas, priority order, known patterns, and data acquisition recommendations to guide Planner and Data Query Agent.",
+      "tags": ["assessment-strategy", "planning", "phase-2", "future"],
+      "examples": [
+        "What is the recommended approach for assessing PCI-DSS compliance across all sites?",
+        "Suggest a risk-based assessment strategy for critical infrastructure.",
+        "Which data sources should be prioritized for a security vulnerability assessment?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "url, provider.url, and documentationUrl are placeholder values — replace with actual service endpoints at implementation time.",
+      "securitySchemes.bearerAuth is a placeholder — replace with the platform's actual authentication scheme.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+      "Knowledge Agent is conditionally invoked: Planner includes a Knowledge Agent task only when enterprise context is required for the assessment type.",
+      "Agent determines its task_id from STATE.plan.tasks[] by matching owner: 'Knowledge Agent' and status: 'in_progress'.",
+      "skill 'plan_assessment_strategy' is Phase 2 (not yet active). Included for architecture completeness.",
+      "RAG retrieval is executed internally — the agent formulates the query and retrieves context as part of skill execution.",
+      "Anti-hallucination constraint: Agent must only augment queries with information present in STATE. It must not invent context or produce authoritative findings."
+    ]
+  }
+}

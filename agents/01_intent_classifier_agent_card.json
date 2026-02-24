@@ -1,0 +1,69 @@
+{
+  "name": "Intent Classifier",
+  "description": "Conservative, precise pre-processor that converts a raw user prompt into a structured intent signal. Produces intent_class, meta_intent, domain_details, entities[], and confidence for downstream graph routing by the Planner. Extracts only user-facing semantic concepts — no tool names, data sources, or technical mappings.",
+  "url": "https://placeholder.assessments.internal/agents/intent-classifier",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/intent-classifier",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "classify_intent",
+      "name": "Classify Intent",
+      "description": "Parses the raw user prompt and optional context key-values, then writes a fully structured intent signal to STATE.intent. Emits exactly one intent_class, a meta_intent for conversation-level routing, domain_details (assessment goal, scope, urgency), and a typed entities[] array extracted from user language only. Assigns a 0-1 confidence score. When intent is ambiguous (confidence < 0.5), sets intent_class to unknown_or_needs_clarification and generates a targeted clarification_question; the graph short-circuits and returns the question to the user before the Planner runs.",
+      "tags": ["intent-classification", "pre-processing", "routing", "entity-extraction", "nlp"],
+      "examples": [
+        "Provide me a summary of the configuration best practice assessment, show the top 5 issues.",
+        "Check security vulnerabilities on production network devices at Site-A.",
+        "The latest assessment has SLIC findings for DataCenter-1 — what do the critical ones mean?",
+        "Show me critical findings from last week at DataCenter-1.",
+        "What changed in the latest assessment compared to the previous one?",
+        "How should I configure BGP route filtering to follow best practices?",
+        "What's the status?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "url, provider.url, and documentationUrl are placeholder values. Replace with real endpoints before implementation.",
+      "securitySchemes.bearerAuth is a placeholder. Replace with the actual scheme (OAuth2, OIDC, mTLS, ApiKey, etc.) at implementation time. See A2A spec section 4.5 Security Objects.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+      "Intent Classifier extracts user-facing semantic entities only (site, device, environment, timeframe, severity, assessment_type, output_format). It must NOT extract tool names, data sources, database identifiers, or any implementation-level detail.",
+      "intent_class values: cbp_assessment (assessment results/findings/stats/trends), cbp_expert_insights (SLIC findings requiring enterprise knowledge enrichment), cbp_generic (general config/BP question — linguistic signals), security_assessment, unknown_or_needs_clarification. When unknown_or_needs_clarification is emitted, clarification_question is populated and the graph short-circuits (Planner does not run).",
+      "meta_intent values: new_topic, followup_question, clarification_request, acknowledgement, confirmation, cancellation, escalation."
+    ]
+  }
+}

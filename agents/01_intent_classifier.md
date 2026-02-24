@@ -14,7 +14,6 @@ Convert the raw user prompt (and optional key-values) into a structured intent s
 ## Scope (in)
 - Interpret the user’s request and extract:
   - likely goal/outcome
-
   - scope boundaries (site, environment, time range)
   - targets (devices, subnets, services)
   - constraints (read-only, timeframe, SLAs)
@@ -35,6 +34,7 @@ Write ONLY:
 - `STATE.intent.domain_details`
 - `STATE.intent.entities[]`
 - `STATE.intent.confidence`
+- `STATE.intent.clarification_question` (populated only when `intent_class == "unknown_or_needs_clarification"`; `null` otherwise)
 
 Also append one entry to:
 - `STATE.trace.node_run_order[]`
@@ -42,8 +42,10 @@ Also append one entry to:
 
 ## Classification Rules
 - Emit exactly one `intent_class`.
-- If the user intent is ambiguous, keep intent coarse and populate:
-  - `STATE.data.data_gaps[]` and/or `STATE.final.missing_inputs[]` (via Planner later; do not write there yourself).
+- If the user intent is ambiguous (confidence < 0.5):
+  - Set `intent_class` to `unknown_or_needs_clarification`
+  - Generate a targeted `clarification_question` that asks the user to disambiguate (e.g., which domain, which scope, what goal)
+  - The graph will short-circuit — returning the clarification question to the user **before** the Planner runs
 - Do not invent entities; if missing, set to `unknown` and rely on Planner to request/derive.
 
 ### What to Extract (User-Facing Concepts Only)
@@ -72,7 +74,7 @@ This section shows complete examples of what the Intent Classifier writes to STA
 **STATE output**:
 ```json
 {
-  "intent_class": "configuration_assessment",
+  "intent_class": "cbp_assessment",
   "meta_intent": "new_topic",
   "domain_details": {
     "assessment_goal": "summarize configuration best practice findings",
@@ -99,7 +101,70 @@ This section shows complete examples of what the Intent Classifier writes to STA
 }
 ```
 
-### Example 2: Security Investigation
+### Example 2: CBP Expert Insights (SLIC Enrichment)
+
+**User prompt**: "The latest assessment has SLIC findings for DataCenter-1. Can you explain what the critical ones mean and how they map to our network policies?"
+
+**STATE output**:
+```json
+{
+  "intent_class": "cbp_expert_insights",
+  "meta_intent": "new_topic",
+  "domain_details": {
+    "assessment_goal": "interpret SLIC findings and map to enterprise network policy",
+    "scope": {
+      "site": "DataCenter-1",
+      "environment": null,
+      "time_range": "latest"
+    },
+    "urgency": "normal"
+  },
+  "entities": [
+    {
+      "type": "site",
+      "value": "DataCenter-1",
+      "confidence": 1.0
+    },
+    {
+      "type": "severity",
+      "value": "critical",
+      "confidence": 0.95
+    }
+  ],
+  "confidence": 0.92
+}
+```
+
+### Example 3: CBP Generic (General Best-Practice Question)
+
+**User prompt**: "How should I configure BGP route filtering to follow best practices?"
+
+**STATE output**:
+```json
+{
+  "intent_class": "cbp_generic",
+  "meta_intent": "new_topic",
+  "domain_details": {
+    "assessment_goal": "answer general configuration best-practice question",
+    "scope": {
+      "site": null,
+      "environment": null,
+      "time_range": null
+    },
+    "urgency": "normal"
+  },
+  "entities": [
+    {
+      "type": "assessment_type",
+      "value": "configuration_best_practice",
+      "confidence": 0.95
+    }
+  ],
+  "confidence": 0.90
+}
+```
+
+### Example 4: Security Investigation
 
 **User prompt**: "Check security vulnerabilities on production network devices at Site-A"
 
@@ -138,7 +203,7 @@ This section shows complete examples of what the Intent Classifier writes to STA
 }
 ```
 
-### Example 3: Ambiguous Request
+### Example 5: Ambiguous Request (triggers clarification gate)
 
 **User prompt**: "What's the status?"
 
@@ -157,18 +222,20 @@ This section shows complete examples of what the Intent Classifier writes to STA
     "urgency": "normal"
   },
   "entities": [],
-  "confidence": 0.30
+  "confidence": 0.30,
+  "clarification_question": "Could you clarify what you'd like to check? For example: a configuration best practice assessment summary, security posture review, or something else?"
 }
 ```
+
+**Graph behaviour**: Because `intent_class == "unknown_or_needs_clarification"`, the graph short-circuits — `clarification_question` is returned to the user and the Planner does **not** run. The user's reply re-enters the graph as a new `user_prompt`.
 
 ### Field Descriptions
 
 **intent_class**: Single best label from your project taxonomy. Common values:
-- `network_assessment`
-- `configuration_assessment`
+- `cbp_assessment` — user asking about assessment results, findings, stats, trends, risk, or remediation
+- `cbp_expert_insights` — assessment contains SLIC findings requiring enterprise knowledge enrichment
+- `cbp_generic` — general configuration or best-practice question (linguistic signals: "how should I configure", "best practice for", "what does this rule mean", "why is this flagged")
 - `security_assessment`
-- `performance_degradation_investigation`
-- `compliance_check`
 - `unknown_or_needs_clarification`
 
 **meta_intent**: Conversational-level intent showing dialogue behavior. Common values:

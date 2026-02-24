@@ -1,0 +1,86 @@
+{
+  "name": "Data Query Agent",
+  "description": "Retrieval and normalization specialist. Conditionally invoked by Planner when infrastructure data is required. Executes dual-path retrieval logic: MCP path for well-known intents (mapped to structured tool calls against Trino) and SQL path for complex or bespoke intents (schema + ontology driven query generation). Normalizes all results into a canonical Assessment Context for downstream domain validators.",
+  "url": "https://placeholder.assessments.internal/agents/data-query-agent",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/data-query-agent",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "retrieve_via_mcp",
+      "name": "Retrieve Assessment Data via MCP",
+      "description": "MCP path retrieval for well-known intents. Selects the appropriate MCP tool based on STATE.intent.intent_class, binds STATE.intent.entities[] to tool-specific parameters (with optional enrichment from Knowledge Agent enterprise context), validates required parameters, and invokes the tool. Normalizes the tool result into a canonical Assessment Context and writes to task.outputs.assessment_context. Available tools: assessment_analysis_tool (overview, summary, filtering, assets, technology, exceptions), assessment_comparison_tool (trend/delta analysis, asset-level changes), issue_tracking_tool (open compliance gaps, persistent rule failures, remediation focus).",
+      "tags": ["retrieval", "mcp", "infrastructure", "assessment-context", "configuration", "trino"],
+      "examples": [
+        "Show me the assessment results for ASSESS-2026-001.",
+        "What are the top critical and high findings?",
+        "Compare current assessment with last month.",
+        "What changed since the last assessment — show progress.",
+        "What open issues need to be fixed in the production environment?",
+        "Get full assessment details including assets and rules for ASSESS-2026-002."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "retrieve_via_sql",
+      "name": "Retrieve Assessment Data via SQL",
+      "description": "SQL path retrieval for complex or bespoke intents not covered by well-known MCP tool mappings, or when the MCP path is unavailable. Reads structural schema (STATE.schema: tables, columns, types, joins) and semantic ontology (STATE.ontology: descriptions, value enumerations, entity-to-column mappings) to generate a read-only, parameterized, LIMIT-bounded SQL query. Executes against the configured data source and normalizes the result into a canonical Assessment Context written to task.outputs.assessment_context. Constraints: SELECT only (no mutations), parameterized inputs, bounded by time_range when applicable, references only tables/columns present in STATE.schema.",
+      "tags": ["retrieval", "sql", "infrastructure", "assessment-context", "schema", "ontology", "bespoke"],
+      "examples": [
+        "How many devices per site have critical findings in the last 30 days?",
+        "Show me all assets with open vulnerabilities grouped by severity and platform.",
+        "List all findings for devices in VLAN 100 that were introduced after the last patch window.",
+        "Which sites have the most unresolved compliance gaps across all assessment types?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "url, provider.url, and documentationUrl are placeholder values — replace with actual service endpoints at implementation time.",
+      "securitySchemes.bearerAuth is a placeholder — replace with the platform's actual authentication scheme.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+      "Data Query Agent is conditionally invoked: Planner includes a Data Query Agent task only when data retrieval is required for the assessment.",
+      "Agent determines its task_id from STATE.plan.tasks[] by matching owner: 'Data Query Agent' and status: 'in_progress'.",
+      "MCP path tool selection: assessment_analysis_tool (overview/summary/filtering/assets/technology), assessment_comparison_tool (trend/delta), issue_tracking_tool (remediation focus, persistent failures). Internal service functions (get_assessment_summary, compare_assessments, get_unresolved_issues, get_assessment_details) are implementation details not directly callable by this agent.",
+      "SQL path constraint: SELECT only, parameterized inputs, LIMIT required, bounded by time_range when applicable, only tables/columns present in STATE.schema may be referenced.",
+      "Agent never fabricates results — sets values to 'unknown' if tool/query results are not provided.",
+      "All output is written to the canonical Assessment Context format regardless of retrieval path (MCP or SQL).",
+      "Schema and ontology management (pre-loaded, dynamic discovery, Knowledge Agent enrichment) is outside this agent's scope — it assumes STATE.schema and STATE.ontology are populated prior to invocation."
+    ]
+  }
+}

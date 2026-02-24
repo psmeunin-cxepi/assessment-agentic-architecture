@@ -1,0 +1,69 @@
+{
+  "name": "Security Assessment Agent",
+  "description": "Evidence-based security posture assessor. Evaluates configuration data, asset inventory, and security events from Data Query Agent outputs to identify insecure configurations, missing hardening controls, and exposure risks. Claims specific CVEs only when both platform version data and an in-context CVE mapping are present. Produces structured security findings with confidence scores, exposure assumptions, and prioritized risks. Does not run live vulnerability scans or make external calls.",
+  "url": "https://placeholder.assessments.internal/agents/security-assessment",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/security-assessment",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "security_assessment",
+      "name": "Security Assessment",
+      "description": "Assesses security posture by evaluating device configurations for insecure settings, missing hardening controls, legacy protocol exposure, and management plane risks. Optionally incorporates platform/version inventory for vulnerability posture context and security events for threat detection. Produces findings[] with severity, confidence, exposure_assumptions, and evidence_refs. Will not assert specific CVEs without version data and an in-context CVE mapping. Uses enterprise context from Knowledge Agent to apply organizational security policies and site criticality classifications.",
+      "tags": ["security", "posture", "configuration", "hardening", "assessment", "exposure"],
+      "examples": [
+        "Assess the security posture of DataCenter-1.",
+        "Run a security check across all production assets.",
+        "What are the top security risks for the branch offices?",
+        "Check for insecure management access on core routers.",
+        "Are there any missing hardening controls at Site-A?",
+        "Show me high-severity security findings for production firewalls."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "url, provider.url, and documentationUrl are placeholder values. Replace with real endpoints before implementation.",
+      "securitySchemes.bearerAuth is a placeholder. Replace with the actual scheme (OAuth2, OIDC, mTLS, ApiKey, etc.) at implementation time. See A2A spec section 4.5 Security Objects.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+
+      "Live vulnerability scans and external CVE database calls are out of scope for this agent. All data must be provided via Data Query Agent outputs.",
+      "findings[].exposure_assumptions[] must be populated when making claims about network exposure without confirmed topology evidence.",
+      "Configuration analysis (security_assessment) can run with configs only. Inventory and events are optional inputs that enrich findings when present."
+    ]
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "name": "Config Best Practice Agent",
+  "description": "Evidence-based configuration standards validator with three skills mapped to distinct intent classes. cbp_assessment: consumes assessment data from the Data Query Agent and optional enterprise knowledge from the Knowledge Agent to validate configurations, answer user questions, summarize findings, compute statistics, perform trend/delta analysis, and signal chart-ready data. cbp_expert_insights: enriches SLIC assessment findings with enterprise knowledge to produce expert narratives. cbp_generic: answers general configuration and best-practice questions grounded in enterprise knowledge. Does not fetch data and does not generate CVE claims.",
+  "url": "https://placeholder.assessments.internal/agents/config-best-practice",
+  "provider": {
+    "organization": "Assessments Platform",
+    "url": "https://placeholder.assessments.internal"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://placeholder.assessments.internal/docs/agents/config-best-practice",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true,
+    "extensions": [
+      {
+        "uri": "https://placeholder.assessments.internal/extensions/skill-schema/v1",
+        "description": "Declares per-skill JSON Schema input/output contracts. Schema definitions are in the agent documentation at documentationUrl.",
+        "required": false
+      }
+    ]
+  },
+  "securitySchemes": {
+    "bearerAuth": {
+      "httpAuthSecurityScheme": {
+        "scheme": "bearer",
+        "description": "Bearer token — placeholder, replace with real scheme at implementation time"
+      }
+    }
+  },
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "cbp_assessment",
+      "name": "CBP Assessment",
+      "description": "Answers free-text and pre-seeded user queries about configuration best practice assessment results. Produces assessment summaries, statistics (checks performed/failed, % at risk), risk prioritization, corrective action recommendations, product family and technology breakdowns, and asset criticality analysis. In TREND mode (when assessment_context contains comparison data from assessment_comparison_tool), classifies findings as new or persistent via delta_status, surfaces resolved issues in outputs.summary narrative, identifies improved/worsened assets, and reports persistent open deviations. Signals chart-ready data (bar, pie, trend) via chart_hints[] for UI rendering. Applies enterprise context from Knowledge Agent to validate approved exceptions, organizational policies, and site-specific standards.",
+      "tags": ["configuration", "best-practices", "assessment", "summary", "statistics", "trend-analysis", "risk-prioritization", "chart-hints", "product-family", "corrective-actions"],
+      "examples": [
+        "Can you provide a summary of my recent Configuration Best Practice assessment?",
+        "How many configuration best practice checks were performed in the latest assessment, and how many of those checks failed?",
+        "How many assets were evaluated in this assessment, and what percentage of them are considered at risk?",
+        "What are the most common configuration deviations across my network?",
+        "Which Cisco product families have the most deviations from configuration best practices?",
+        "Which areas have the most deviations from configuration standards?",
+        "What deviations from best practice rules pose the highest risk to my network?",
+        "What corrective actions are recommended?",
+        "Which assets show maximum critical configuration deviations?",
+        "Provide a breakdown of critical configuration deviations by asset criticality.",
+        "What has changed since my last assessment?",
+        "Which assets have improved or worsened since the previous assessment?",
+        "Which critical best practice deviations remain open from the prior assessment?",
+        "Show breakdown of configuration best practice rules deviations by severity, technology, and OS."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "cbp_expert_insights",
+      "name": "CBP Expert Insights",
+      "description": "Enriches SLIC assessment findings with enterprise knowledge to produce contextually-relevant expert insights. Assessment data (containing SLIC findings) and enterprise knowledge are both required inputs. Leads with SLIC data, applies enterprise context (exceptions, policies, site standards) to produce enriched interpretation. Populates findings[] from SLIC data; outputs.summary carries the expert narrative.",
+      "tags": ["configuration", "best-practices", "expert-insights", "slic", "enterprise-knowledge", "enrichment"],
+      "examples": [
+        "The latest assessment has SLIC findings for DataCenter-1. Can you explain what the critical ones mean and how they map to our network policies?",
+        "What do the SLIC findings in this assessment tell us about our configuration risk posture?",
+        "Interpret the SLIC results from the latest assessment against our enterprise standards."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "cbp_generic",
+      "name": "CBP Generic",
+      "description": "Answers general configuration and best-practice questions grounded in enterprise knowledge. No assessment data required. Enterprise knowledge is the primary input. Handles linguistic queries such as 'how should I configure X?', 'what is the best practice for Y?', 'what does this rule mean?', 'why is this flagged?'. Produces a knowledge-grounded answer in outputs.summary; findings[] is empty.",
+      "tags": ["configuration", "best-practices", "generic", "enterprise-knowledge", "guidance"],
+      "examples": [
+        "How should I configure BGP route filtering to follow best practices?",
+        "What does the AUTH-001 rule check for?",
+        "Why would a device be flagged for missing NTP configuration?",
+        "What is the recommended approach for securing management plane access on Cisco IOS?",
+        "What best practices apply to ACL configuration on WAN-facing interfaces?"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "_metadata": {
+    "spec": "Google A2A Protocol - AgentCard",
+    "specVersion": "1.0",
+    "cardCreated": "2026-02-24",
+    "status": "architecture-draft",
+    "notes": [
+      "Scoped to CXP-17653 (Feature 07: AI Assistant - Q3 GA scope) — three skills: cbp_assessment, cbp_expert_insights, cbp_generic. Each skill maps 1:1 to an intent_class resolved by the Intent Classifier. compliance_check (CIS/NIST) is not in Q3 GA scope.",
+      "url, provider.url, and documentationUrl are placeholder values. Replace with real endpoints before implementation.",
+      "securitySchemes.bearerAuth is a placeholder. Replace with the actual scheme (OAuth2, OIDC, mTLS, ApiKey, etc.) at implementation time. See A2A spec section 4.5 Security Objects.",
+      "capabilities.extensions[skill-schema] URI is a placeholder. The referenced spec document must define per-skill input/output JSON Schemas. See documentationUrl.",
+      "TREND mode activates when assessment_context contains detailed_findings.new_issues[], resolved_issues[], or persistent_issues[] (shape from assessment_comparison_tool). Resolved items go to outputs.summary narrative only — never to outputs.findings[] (Option A).",
+      "chart_hints[] is an output signal for the UI layer only. This agent does not render charts or generate visual output files.",
+      "Export to CSV/PDF and user feedback collection are explicitly out of scope — handled by the UI/platform layer.",
+      "findings[].delta_status is populated only in TREND mode: 'new' for new_issues entries, 'persistent' for persistent_issues entries. Omitted in single-assessment mode.",
+      "Security vulnerability claims (CVEs) are out of scope — delegated to Security Assessment Agent."
+    ]
+  }
+}
