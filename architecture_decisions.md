@@ -1,10 +1,10 @@
-# Caveats & Future Considerations
+# Architecture Decisions & Future Considerations
 
 This document tracks known limitations in the current architecture and planned enhancements for future phases.
 
 ---
 
-## Current Caveats
+## Current Considerations
 
 ### 1. No Replanning Mechanism
 **Status:** Intentionally removed for initial implementation

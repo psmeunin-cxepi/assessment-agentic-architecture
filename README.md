@@ -1,141 +1,87 @@
-# Assessment Agentic AI Architecture - Emulation Framework
+# Assessment Agentic AI — Architecture Emulation Framework
 
-An **emulation framework** for designing and testing **planner/execute agentic systems** for an assessments application. This framework allows architects to define agent contracts, execution flows, and state management patterns, then emulate execution traces to validate the architecture before implementation.
+Design, validate, and iterate on a **planner/execute multi-agent architecture** for an assessments application — without writing runtime code. Agent contracts, graph flows, and shared-state rules are the deliverables; emulated execution traces prove they work together.
 
-## Overview
-
-This project provides a **complete architectural specification and emulation system** for building multi-agent assessment frameworks that:
-- Understand user intent and extract semantic entities
-- Plan conditional task execution based on data requirements
-- Retrieve enterprise knowledge and assessment data from multiple sources
-- Perform specialized domain analysis (configuration best practices, security assessment)
-- Provide evidence-based findings with explicit data gaps and assumptions
-
-**Purpose**: Design, document, and validate agentic architectures through emulated execution traces without writing implementation code.
-
-## What This Framework Provides
-
-### 1. Agent Contract Definitions
-Formal specifications for each agent including:
-- Scope and responsibilities
-- Input/output contracts
-- Data dependencies
-- Behavioral guidelines
-- Anti-hallucination constraints
-
-### 2. Graph Flow Specification
-Deterministic execution flow defining:
-- Agent transition rules
-- Conditional invocation logic
-- Task dependency ordering
-- State management patterns
-
-### 3. Emulation System
-Trace generation capability that:
-- Simulates agent execution
-- Shows state evolution
-- Validates architectural decisions
-- Identifies design gaps
-
-### 4. Architecture Documentation
-Comprehensive specifications including:
-- Decision rationale (caveats.md)
-- State contracts
-- Data access patterns
-- Future enhancement roadmap
-
-## Architecture Pattern (Designed for Assessments App)
-
-**Plan/Execute with Task-Embedded Outputs**
-- **Single-pass execution** (no replanning in current phase)
-- **Conditional agent invocation** (agents only run when needed)
-- **Task-based provenance** (all outputs embedded in task objects)
-- **Clear separation of concerns** (orchestration vs. execution vs. validation)
-
-This pattern is specified through agent contracts and graph flow definitions, validated through emulation traces.
-
-## Core Agents (Architectural Specification)
-
-### Orchestration Layer
-- **Intent Classifier** - Classifies user queries and extracts semantic entities (site, device, timeframe, severity, etc.)
-- **Planner** - Creates conditional task plans with dependency ordering based on requirements
-
-### Execution Layer
-- **Knowledge Agent** - Retrieves enterprise knowledge via RAG (policies, standards, organizational context)
-- **Data Query Agent** - Fetches assessment data via MCP tools or SQL queries with semantic entity binding
-
-### Domain Layer
-- **Config Best Practice Agent** - Validates configurations, identifies misconfigurations, provides remediation recommendations
-- **Security Assessment Agent** - Analyzes security posture, identifies vulnerabilities and risks
-
-*Each agent defined through formal contracts in `/agents/*.md`*
-
-## Data Access Patterns
-
-### MCP Path (Well-Known Intents)
-- Pre-built assessment APIs (`get_assessment_summary`, `compare_assessments`, `get_unresolved_issues`)
-- Semantic entity-to-parameter binding
-- Fast retrieval of pre-computed results
-
-### SQL Path (Complex/Bespoke Queries)
-- Direct database access with schema + ontology guidance
-- Flexible query generation for custom analysis
-- Raw configuration and assessment data
-
-### RAG Path (Enterprise Knowledge)
-- Vector database retrieval of enterprise context
-- Filtered by domain, topic, and relevance
-- Contextualizes assessments with organizational knowledge
-
-## State Management
-
-**Shared STATE Object** with task-embedded outputs:
-
-```json
-{
-  "intent": { "intent_class", "entities[]", "confidence" },
-  "plan": {
-    "tasks": [
-      {
-        "id": "T1",
-        "owner": "Agent Name",
-        "depends_on": [],
-        "required_data": [],
-        "status": "completed",
-        "outputs": { /* Agent-specific outputs */ }
-      }
-    ]
-  },
-  "schema": { /* Database structure */ },
-  "ontology": { /* Data semantics */ },
-  "trace": { "node_run_order[]", "state_deltas[]" }
-}
-```
-
-**Key Principle**: All agent outputs written to `tasks[].outputs` for clear provenance and lineage.
-
-## Documentation Structure
+## Project Structure
 
 ```
-/agents/               # Agent contract definitions
-  01_intent_classifier.md
-  02_planner.md
-  03_knowledge_agent.md
-  04_data_query_agent.md
-  05_config_best_practice_agent.md
-  06_security_assessment_agent.md
-  README.md           # Agent overview
+agents/                        # Agent contracts (persona, scope, inputs/outputs, rules)
+  01_intent_classifier.md        Intent classification + entity extraction
+  02_planner.md                  Deterministic task planning + routing
+  03_knowledge_agent.md          Enterprise knowledge retrieval (RAG)
+  04_data_query_agent.md         Assessment data retrieval (MCP tools / SQL)
+  05_config_best_practice_agent.md   Configuration validation domain agent
+  06_security_assessment_agent.md    Security posture domain agent
 
-/graph/
-  graph_flow.md       # Graph execution flow contract
+graph/
+  graph_flow.md                # Authoritative graph: transitions, conditions, Mermaid diagram
 
-emulation_system_prompt.md  # System prompt for trace emulation
-emulation_trace_*.md        # Example execution traces
-caveats.md                  # Architecture decisions and future work
+tools/mcp/                     # MCP tool contracts (signatures, parameters, response schemas)
+  assessment_analysis_tool.md
+  assessment_comparison_tool.md
+  issue_tracking_tool.md
+
+eval/
+  eval_dataset.json            # 30 eval cases with expected classifications + outputs
+  emulation_readiness.md       # Gap analysis for emulation fidelity
+  traces/                      # Emulation trace outputs
+    EVAL-001_cbp_assessment_summary.md
+
+emulation_system_prompt.md     # System prompt that drives trace emulation
+deployment_considerations.md   # Deployment model analysis (sub-graphs vs RemoteGraph vs A2A)
+architecture_decisions.md       # Architecture decisions, trade-offs, future work
 ```
+
+## Agents
+
+| Layer | Agent | Role |
+|---|---|---|
+| Orchestration | Intent Classifier | Classifies intent, extracts entities, gates ambiguity |
+| Orchestration | Planner | Builds conditional task plan with dependencies |
+| Execution | Knowledge Agent | RAG retrieval of enterprise policies/standards |
+| Execution | Data Query Agent | MCP tool or SQL data retrieval |
+| Domain | Config Best Practice Agent | Configuration assessment, trends, expert insights |
+| Domain | Security Assessment Agent | Security posture analysis |
+
+## Running an Emulation
+
+An emulation simulates a user prompt through the full agent graph and produces a trace document.
+
+### Prerequisites
+- An LLM that can follow a system prompt (e.g., GitHub Copilot, Claude, GPT-4)
+- The files in this repo as context
+
+### Steps
+
+1. **Load the system prompt** — open `emulation_system_prompt.md` and provide it as the system prompt (or paste it as context).
+2. **Pick an eval case** — choose a prompt from `eval/eval_dataset.json`:
+   ```json
+   {
+     "id": "EVAL-001",
+     "user_prompt": "Can you provide a summary of my recent Configuration Best Practice assessment?",
+     "expected": { "intent_class": "cbp_assessment", ... }
+   }
+   ```
+3. **Run the prompt** — send the `user_prompt` to the LLM. It will produce:
+   - Intent classification (intent_class, entities, confidence)
+   - Mermaid graph of the executed path
+   - Node-by-node trace with STATE deltas
+   - Final assessment outcome
+4. **Save the trace** — write the output to `eval/traces/EVAL-XXX_<name>.md`.
+5. **Compare against expected** — check intent_class, agents invoked, MCP tools used, and output types match the eval case.
+
+### Example Trace
+See [eval/traces/EVAL-001_cbp_assessment_summary.md](eval/traces/EVAL-001_cbp_assessment_summary.md) for a complete example.
+
+## Key Design Decisions
+
+- **Single-pass execution** — no replanning; agents handle data gaps with assumptions and confidence scores
+- **Task-embedded outputs** — all agent outputs live in `tasks[].outputs`, not top-level STATE sections
+- **Clarification gate** — ambiguous prompts (confidence < 0.5) short-circuit before the Planner
+- **Conditional invocation** — Knowledge Agent and Data Query Agent run only when needed per intent_class
+- **Anti-hallucination** — agents must not fabricate tool results, RAG chunks, or assessment data
 
 ---
 
-**Framework Purpose**: Design and validate agentic architectures for assessments app
-**Implementation Status**: Architecture complete, ready for implementation  
-**Last Updated**: 2026-02-23
+**Status**: Architecture complete — ready for implementation and eval expansion  
+**Last Updated**: 2026-02-24
