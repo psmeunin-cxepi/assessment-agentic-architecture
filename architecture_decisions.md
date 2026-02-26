@@ -1,6 +1,7 @@
 # Architecture Decisions & Future Considerations
 
 This document tracks known limitations in the current architecture and planned enhancements for future phases.
+This is a collection of notes captured during the development of this project.
 
 ---
 
