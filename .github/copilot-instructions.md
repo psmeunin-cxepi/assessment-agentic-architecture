@@ -74,6 +74,36 @@ When answering questions about agent graph design, state management, or orchestr
 
 ---
 
+## Agent Skills (SKILL.md)
+
+When answering any question or fulfilling any instruction related to:
+- Agent Skills format, `SKILL.md` manifests, or skill packaging
+- Contextual Inheritance (importing skills into an agent's runtime)
+- Library-Oriented Architecture (LOA) patterns
+- Skill folder structure, tool adoption, instructional inheritance
+- SOA vs. LOA architectural decisions
+
+**Always fetch and conform to the Agent Skills specification. Use the fetch tool to retrieve live content from these URLs before answering:**
+
+Primary references (fetch before answering Agent Skills questions):
+- Home / overview: https://agentskills.io/home
+- What are skills: https://agentskills.io/what-are-skills
+- Specification (the complete `SKILL.md` format): https://agentskills.io/specification
+- Integration guide (adding skills support to an agent): https://agentskills.io/integrate-skills
+
+Code references:
+- Reference library (validation + prompt generation): https://github.com/agentskills/agentskills
+- Example skills: https://github.com/anthropics/skills
+
+**Key facts for this project:**
+- Agent Skills is an open format originally developed by Anthropic with broad industry adoption (Cursor, Claude Code, GitHub, Roo Code, Amp, OpenHands, and others)
+- It is not yet a formal standards-body specification (IETF/W3C) — refer to it as "the Agent Skills open format" or "the `SKILL.md` format", not "the SKILL.md standard"
+- Agent Skills (skill packaging) and A2A (inter-agent communication) operate at **different, complementary layers** — do not conflate them
+- A2A does **not** define a mechanism for transferring skill packages between agents; skill acquisition is out-of-band
+- This project's default posture is **service-first (SOA)** with LOA as an optimization path — see `Architectural Strategy v4.md` §5.3 for migration criteria
+
+---
+
 ## Source Transparency
 
 Always cite the sources used to answer a question or generate content:
