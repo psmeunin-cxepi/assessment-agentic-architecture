@@ -6,7 +6,6 @@
 
 **Relationship to other documents:**
 - [deployment_options.md](deployment_options.md) — the **deployment/physical view**: how these logical agents are mapped to runtime (services vs. graph nodes)
-- [graph/graph_flow.md](graph/graph_flow.md) — the **execution flow**: deterministic graph control-flow and transition rules
 - [agents/*.md](agents/) — the **agent contracts**: detailed persona, inputs, outputs, and rules per agent
 
 ---
