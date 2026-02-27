@@ -369,12 +369,11 @@ flowchart TD
 
 This logical view is deliberately deployment-agnostic. The following concerns are addressed in other documents:
 
-| Concern                                                 | Document                                                         |
-| ------------------------------------------------------- | ---------------------------------------------------------------- |
-| How agents are deployed (services vs. graph nodes)      | [deployment_options.md](deployment_options.md)                   |
-| Whether core agents are shared or duplicated per domain | [deployment_options.md](deployment_options.md)                   |
-| Communication protocol (A2A, HTTP, shared state)        | [deployment_options.md](deployment_options.md)                   |
-| Scaling, containers, process boundaries                 | [deployment_options.md](deployment_options.md)                   |
-| SOA vs. LOA architectural strategy                      | [Architectural Strategy v4.md](Architectural%20Strategy%20v4.md) |
-| Graph transition rules and edge conditions              | [graph/graph_flow.md](graph/graph_flow.md)                       |
-| Individual agent contracts (full detail)                | [agents/*.md](agents/)                                           |
+| Concern                                                 | Document                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| How agents are deployed (services vs. graph nodes)      | [deployment_options.md](deployment_options.md)                                       |
+| Whether core agents are shared or duplicated per domain | [deployment_options.md](deployment_options.md)                                       |
+| Communication protocol (A2A, HTTP, shared state)        | [deployment_options.md](deployment_options.md)                                       |
+| Scaling, containers, process boundaries                 | [deployment_options.md](deployment_options.md)                                       |
+| How agents acquire capabilities (static vs. dynamic)    | [agent_capability_architecture.md](agent_capability_architecture.md)                 |
+| Agent Skills, contextual inheritance, migration path    | [agent_capability_architecture.md](agent_capability_architecture.md)                 |
