@@ -25,22 +25,23 @@ The scope, persona, responsibilities, inputs/outputs, and constraints of each no
 Supporting agents appear in `graph/graph_flow.md` as optional planner hooks.
 They MUST NOT be invoked unless a corresponding `agents/*.md` contract exists for them.
 
-## Shared State Contract (must follow)
-Maintain and evolve a single shared object called `STATE` with ONLY these top-level keys:
+## GraphState Contract (must follow)
+Maintain and evolve a single shared object called `STATE` (the GraphState) with ONLY these top-level keys.
+Each agent writes to its designated section(s) — no agent overwrites another agent's section.
 
-- `input`: { `user_prompt`, `context_kv` }
-- `intent`: { `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` }
-- `plan`: { `tasks[]`, `routing[]` }
+- `input`: { `user_prompt`, `context_kv` } — **written by:** external (pre-graph)
+- `intent`: { `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` } — **written by:** Intent Classifier
+- `plan`: { `tasks[]`, `routing[]` } — **written by:** Planner
   - Each task has: `{ id, owner, depends_on[], required_data[], status, outputs: {} }`
-  - Agent outputs written to `tasks[].outputs` (see individual agent contracts for field names)
+  - `tasks[].outputs` — **written by:** the agent assigned to execute that task (core or domain agent)
 - `routing`: { `last_decision` }
-- `schema`: { `dialect`, `tables[]`, `columns[]`, `relationships[]` } (for SQL Path)
-- `ontology`: { `tables: {...}` } (semantic metadata for SQL Path - table/column meanings, value enumerations)
-- `trace`: { `node_run_order[]`, `state_deltas[]` }
+- `schema`: { `dialect`, `tables[]`, `columns[]`, `relationships[]` } (for SQL Path) — **pre-loaded**
+- `ontology`: { `tables: {...}` } (semantic metadata for SQL Path - table/column meanings, value enumerations) — **pre-loaded**
+- `trace`: { `node_run_order[]`, `state_deltas[]` } — **written by:** all agents (append-only)
 - `conversation`: { `history[]` } (future: multi-turn context; not populated in Phase 1)
 
 ### Deprecated STATE keys (do NOT use)
-All agent outputs MUST live in `tasks[].outputs`. Legacy top-level keys are deprecated: `plan.required_data[]`, `data.*`, `knowledge.*`, `findings.*`, `mcp.*`, `sql.*`, `final.*`.
+Core and domain agent outputs MUST live in `tasks[].outputs`. Legacy top-level keys are deprecated: `plan.required_data[]`, `data.*`, `knowledge.*`, `findings.*`, `mcp.*`, `sql.*`, `final.*`.
 
 ### State rules
 - Do not invent new keys outside the contract.

@@ -68,7 +68,8 @@ When answering any question or fulfilling any instruction related to:
 When answering questions about agent graph design, state management, or orchestration patterns in this project:
 - Follow LangGraph conventions for node/edge design
 - STATE is the single shared object passed between nodes
-- Task-embedded outputs pattern: agents write to `STATE.plan.tasks[id].outputs`, never to top-level STATE sections
+- GraphState is the formal data model — each agent writes to designated sections (orchestration agents to top-level sections, core/domain agents to `tasks[id].outputs`)
+- Task-scoped outputs pattern for core/domain agents: write to `STATE.plan.tasks[id].outputs`, never to other agents' state sections
 - Execution is single-pass (no replanning in Phase 1)
 - Knowledge Agent and Data Query Agent are conditionally invoked; domain agents always run
 
