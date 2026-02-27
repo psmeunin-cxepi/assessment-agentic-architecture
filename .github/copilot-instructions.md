@@ -145,3 +145,4 @@ Key requirements extracted from CXP-17653 (re-fetch to validate):
 - Do not use deprecated STATE key patterns in any generated content
 - When generating or modifying agent cards, validate against A2A AgentCard schema fields listed above
 - When referencing agent names, use exact names: `Intent Classifier`, `Planner`, `Knowledge Agent`, `Data Query Agent`, `Config Best Practice Agent`, `Security Assessment Agent`
+- **Do not use acronyms in documentation.** Always use full agent and component names (e.g., "Knowledge Agent" not "KA", "Data Query Agent" not "DQA", "Config Best Practice" not "CBP", "Security Assessment" not "SA", "Intent Classifier" not "IC"). Acronyms reduce readability for new readers and create ambiguity.

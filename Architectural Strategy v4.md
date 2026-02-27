@@ -11,10 +11,10 @@
 
 To build an agentic system that scales, we must decide how **Domain Agents** (the specialists, e.g., Config Best Practice, Security Assessment) interact with **Core Agents** (the shared utilities, e.g., Knowledge, Data Query). We categorize these interactions into two primary patterns:
 
-| Pattern | Model | One-liner |
-| --- | --- | --- |
+| Pattern                    | Model           | One-liner                                                                                  |
+| -------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
 | **Service-Oriented (SOA)** | "The Delegator" | Domain Agent sends a request to a Core Agent over a network protocol; receives the result. |
-| **Library-Oriented (LOA)** | "The Expert" | Domain Agent imports a Core Agent's skills into its own runtime; executes locally. |
+| **Library-Oriented (LOA)** | "The Expert"    | Domain Agent imports a Core Agent's skills into its own runtime; executes locally.         |
 
 Neither pattern is universally superior. This document provides the criteria for choosing between them and defines how both coexist in a hybrid architecture. The default posture is **service-first (SOA)**, with LOA available as an optimization path once specific criteria are met (see §5.3).
 
@@ -52,15 +52,15 @@ Capabilities are treated as modular Skill Packages using the [Agent Skills open 
 
 ## 3. Comparative Analysis
 
-| Feature | **Service-Oriented (SOA)** | **Library-Oriented (LOA)** |
-| --- | --- | --- |
-| **Performance** | **Higher latency:** Subject to network round-trips and serialization overhead. | **Lower latency:** Zero-network execution; logic runs in the same process. |
+| Feature                | **Service-Oriented (SOA)**                                                                                                                                                                                                                                                                                                                         | **Library-Oriented (LOA)**                                                                                                                                                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Performance**        | **Higher latency:** Subject to network round-trips and serialization overhead.                                                                                                                                                                                                                                                                     | **Lower latency:** Zero-network execution; logic runs in the same process.                                                                                                                               |
 | **Context Management** | **Controllable:** The caller *can* limit context to the final result only, but streaming events, multi-turn clarifications, and inlined artifacts may still accumulate depending on implementation choices. The advantage is having *control surfaces* that LOA lacks (poll vs. stream, artifact-by-reference vs. inline, response summarization). | **Inherent risk:** The imported skill's full instructions, tool calls, and intermediate results all execute inside the host agent's context window. No escape hatch exists to shed intermediate context. |
-| **State Consistency** | **Challenging:** Requires passing state across a network boundary. Both modes must produce equivalent outputs into the same planner/task state schema — see §6 Compatibility Contract. | **Native:** Uses a single, unified GraphState throughout the task. No serialization boundary. |
-| **Model Flexibility** | **Superior:** Each service can use a purpose-fit model (e.g., a cheap model for data retrieval, an expensive model for reasoning). | **Limited:** Typically tied to the host agent's primary model. The imported skill runs under the host's LLM. |
-| **Maintenance** | **Decoupled:** Update the Knowledge Service without touching Domain Agents. Version contracts independently. | **Coupled:** Skills are portable folders, but updates may require re-validating every agent that imports them. |
-| **Security** | **Granular:** Strict API-level permissions, data masking, and tenant-boundary enforcement at the network layer. | **Broad:** Skills typically inherit full access to the host agent's memory, tools, and credentials. Tenant isolation requires explicit guardrails. |
-| **Observability** | **Structured:** Each service call is a discrete span in distributed traces. Easy to attribute latency, cost, and errors. | **Blended:** Skill execution is interleaved with the host agent's reasoning. Harder to isolate for debugging or cost attribution. |
+| **State Consistency**  | **Challenging:** Requires passing state across a network boundary. Both modes must produce equivalent outputs into the same planner/task state schema — see §6 Compatibility Contract.                                                                                                                                                             | **Native:** Uses a single, unified GraphState throughout the task. No serialization boundary.                                                                                                            |
+| **Model Flexibility**  | **Superior:** Each service can use a purpose-fit model (e.g., a cheap model for data retrieval, an expensive model for reasoning).                                                                                                                                                                                                                 | **Limited:** Typically tied to the host agent's primary model. The imported skill runs under the host's LLM.                                                                                             |
+| **Maintenance**        | **Decoupled:** Update the Knowledge Service without touching Domain Agents. Version contracts independently.                                                                                                                                                                                                                                       | **Coupled:** Skills are portable folders, but updates may require re-validating every agent that imports them.                                                                                           |
+| **Security**           | **Granular:** Strict API-level permissions, data masking, and tenant-boundary enforcement at the network layer.                                                                                                                                                                                                                                    | **Broad:** Skills typically inherit full access to the host agent's memory, tools, and credentials. Tenant isolation requires explicit guardrails.                                                       |
+| **Observability**      | **Structured:** Each service call is a discrete span in distributed traces. Easy to attribute latency, cost, and errors.                                                                                                                                                                                                                           | **Blended:** Skill execution is interleaved with the host agent's reasoning. Harder to isolate for debugging or cost attribution.                                                                        |
 
 ---
 
@@ -68,10 +68,10 @@ Capabilities are treated as modular Skill Packages using the [Agent Skills open 
 
 Agent Skills and A2A operate at **different, complementary layers**:
 
-| Layer | Technology | Role |
-| --- | --- | --- |
-| **Skill packaging** | [Agent Skills](https://agentskills.io/) (`SKILL.md`) | Defines *what* a skill contains: instructions, scripts, resources, tool definitions. |
-| **Inter-agent communication** | [A2A Protocol](https://github.com/a2aproject/A2A) | Defines *how* agents discover each other and exchange messages/tasks over a network. |
+| Layer                         | Technology                                           | Role                                                                                 |
+| ----------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Skill packaging**           | [Agent Skills](https://agentskills.io/) (`SKILL.md`) | Defines *what* a skill contains: instructions, scripts, resources, tool definitions. |
+| **Inter-agent communication** | [A2A Protocol](https://github.com/a2aproject/A2A)    | Defines *how* agents discover each other and exchange messages/tasks over a network. |
 
 An agent can use Agent Skills **without** A2A (pure LOA — local file-system skill loading), and can use A2A **without** Agent Skills (pure SOA — remote service delegation). The most flexible systems combine both.
 
@@ -128,14 +128,14 @@ A2A provides the protocol layer for **discovery and delegation**:
 
 Use the table below to determine if a new capability should be a **Skill (LOA)** or a **Service (SOA)**.
 
-| Criteria | **Choose Skill (LOA)** | **Choose Service (SOA)** |
-| --- | --- | --- |
-| **Primary Goal** | Providing data, context, or procedures to enrich reasoning. | Compute-heavy processing (ETL, large-scale data queries, scraping). |
-| **Latency Tolerance** | Low — needs to be near-instant within the reasoning loop. | Higher — user accepts a "thinking" phase; async is acceptable. |
-| **Model Requirements** | Can run on the Domain Agent's model. | Requires a specialized, cheaper, or different LLM. |
-| **Workflow Integration** | Part of a larger reasoning chain — intermediate results feed the next thought. | A standalone, isolated task with a well-defined output contract. |
-| **Security Boundary** | Same tenant, same trust zone, same credentials. | Crosses tenant boundaries, requires data masking, or enforces API-level access control. |
-| **Context Budget** | Skill's instructions + tool outputs fit within the host agent's context window. | Output is large or unpredictable; caller needs to control what enters context. |
+| Criteria                 | **Choose Skill (LOA)**                                                          | **Choose Service (SOA)**                                                                |
+| ------------------------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Primary Goal**         | Providing data, context, or procedures to enrich reasoning.                     | Compute-heavy processing (ETL, large-scale data queries, scraping).                     |
+| **Latency Tolerance**    | Low — needs to be near-instant within the reasoning loop.                       | Higher — user accepts a "thinking" phase; async is acceptable.                          |
+| **Model Requirements**   | Can run on the Domain Agent's model.                                            | Requires a specialized, cheaper, or different LLM.                                      |
+| **Workflow Integration** | Part of a larger reasoning chain — intermediate results feed the next thought.  | A standalone, isolated task with a well-defined output contract.                        |
+| **Security Boundary**    | Same tenant, same trust zone, same credentials.                                 | Crosses tenant boundaries, requires data masking, or enforces API-level access control. |
+| **Context Budget**       | Skill's instructions + tool outputs fit within the host agent's context window. | Output is large or unpredictable; caller needs to control what enters context.          |
 
 ### 5.2 Security Decision Gate
 
@@ -191,12 +191,12 @@ Both SOA and LOA modes must be **output-equivalent**. Regardless of which path e
 
 For the Assessment Agentic Architecture project specifically:
 
-| Capability | Recommended Mode | Rationale |
-| --- | --- | --- |
-| **Knowledge Agent** | SOA (default) | May serve multiple Domain Agents; independent scaling; RAG pipeline benefits from dedicated model tuning. Candidate for LOA promotion if latency becomes critical. |
-| **Data Query Agent** | SOA (default) | Executes MCP tool calls against backend APIs; output size is variable and often large; benefits from context control (summary vs. full payload). |
-| **Config Best Practice Agent** | Domain Agent (consumes SOA services) | Orchestrates KA and DQA results into domain-specific reasoning. |
-| **Security Assessment Agent** | Domain Agent (consumes SOA services) | Same pattern as CBP — orchestrates core services for security domain. |
+| Capability                     | Recommended Mode                     | Rationale                                                                                                                                                          |
+| ------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Knowledge Agent**            | SOA (default)                        | May serve multiple Domain Agents; independent scaling; RAG pipeline benefits from dedicated model tuning. Candidate for LOA promotion if latency becomes critical. |
+| **Data Query Agent**           | SOA (default)                        | Executes MCP tool calls against backend APIs; output size is variable and often large; benefits from context control (summary vs. full payload).                   |
+| **Config Best Practice Agent** | Domain Agent (consumes SOA services) | Orchestrates KA and DQA results into domain-specific reasoning.                                                                                                    |
+| **Security Assessment Agent**  | Domain Agent (consumes SOA services) | Same pattern as CBP — orchestrates core services for security domain.                                                                                              |
 
 This is the Phase 1 posture. LOA optimizations can be evaluated per §5.3 once latency and context-fit data is available from production traces.
 

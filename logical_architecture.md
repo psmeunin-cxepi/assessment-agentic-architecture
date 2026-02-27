@@ -20,33 +20,33 @@ The architecture defines four categories of agents. All agents are LLM-powered w
 
 ### Orchestration Agents
 
-| Agent | Role | Skill(s) | Primary Responsibility |
-|---|---|---|---|
+| Agent                                   | Role          | Skill(s)                | Primary Responsibility                                                                                       |
+| --------------------------------------- | ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Semantic Router / Intent Classifier** | Pre-processor | `intent_classification` | Classify user intent, extract entities, determine routing. Short-circuits on ambiguity (clarification gate). |
-| **Supervisor / Planner** | Orchestrator | `task_planning` | Convert classified intent into a task plan, determine agent routing, manage execution ordering. |
+| **Supervisor / Planner**                | Orchestrator  | `task_planning`         | Convert classified intent into a task plan, determine agent routing, manage execution ordering.              |
 
 ### Core Agents
 
-| Agent | Role | Skill(s) | Data Source | Primary Responsibility |
-|---|---|---|---|---|
-| **SLIC Agent** | Data Retriever | `slic_retrieval` | SLIC DB / Engine | Retrieve SLIC results and annotations for downstream enrichment. |
-| **Knowledge Agent** | Domain Expert | `knowledge_retrieval` | Vector DB (RAG) | Formulate retrieval queries, provide enterprise knowledge (policies, standards, exceptions) to support assessment execution. |
+| Agent                | Role                  | Skill(s)                           | Data Source          | Primary Responsibility                                                                                                                        |
+| -------------------- | --------------------- | ---------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SLIC Agent**       | Data Retriever        | `slic_retrieval`                   | SLIC DB / Engine     | Retrieve SLIC results and annotations for downstream enrichment.                                                                              |
+| **Knowledge Agent**  | Domain Expert         | `knowledge_retrieval`              | Vector DB (RAG)      | Formulate retrieval queries, provide enterprise knowledge (policies, standards, exceptions) to support assessment execution.                  |
 | **Data Query Agent** | Infrastructure Expert | `data_query_mcp`, `data_query_sql` | Trino DB / MCP Tools | Retrieve and normalize device/network data into a canonical Assessment Context. Queries DB directly or via MCP tools with predefined queries. |
 
 ### Domain Agents
 
-| Agent | Role | Skill(s) | Primary Responsibility |
-|---|---|---|---|
-| **Config Best Practice Agent** | Validator | `cbp_assessment`, `cbp_expert_insights`, `cbp_generic` | Analyze assessment data, summarize findings, assess configuration posture against best practices. |
-| **Security Assessment Agent** | Validator | `sec_assessment`, `sec_expert_insights`, `sec_generic` | Identify security risks and posture issues based on available data. Evidence-based, explicit about exposure assumptions. |
+| Agent                          | Role      | Skill(s)                                               | Primary Responsibility                                                                                                   |
+| ------------------------------ | --------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **Config Best Practice Agent** | Validator | `cbp_assessment`, `cbp_expert_insights`, `cbp_generic` | Analyze assessment data, summarize findings, assess configuration posture against best practices.                        |
+| **Security Assessment Agent**  | Validator | `sec_assessment`, `sec_expert_insights`, `sec_generic` | Identify security risks and posture issues based on available data. Evidence-based, explicit about exposure assumptions. |
 
 ### Supporting Agents (TBD)
 
-| Agent | Role | Skill(s) |
-|---|---|---|
-| **Reflector** | Quality gate | `answer_reflection` (TBD) |
-| **Context Pruner** | Context management | `context_summarization` (TBD) |
-| **Context Recovery** | Context management | `context_recovery` (TBD) |
+| Agent                | Role               | Skill(s)                      |
+| -------------------- | ------------------ | ----------------------------- |
+| **Reflector**        | Quality gate       | `answer_reflection` (TBD)     |
+| **Context Pruner**   | Context management | `context_summarization` (TBD) |
+| **Context Recovery** | Context management | `context_recovery` (TBD)      |
 
 > The Ambiguity Handler is **not a separate agent** — ambiguity is handled by the Intent Classifier's `intent_classification` skill (clarification gate).
 
@@ -58,38 +58,38 @@ Skills are the universal unit of capability across the architecture. Every agent
 
 ### Orchestration Skills
 
-| Skill | Agent | Inputs | Outputs | Invocation |
-|---|---|---|---|---|
-| `intent_classification` | Intent Classifier | `user_prompt`, `context_kv` | `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` | Always — first node in every execution |
-| `task_planning` | Planner | `STATE.intent.*` | `plan.tasks[]`, `plan.routing[]` | Always (when `intent_class != "unknown_or_needs_clarification"`) |
+| Skill                   | Agent             | Inputs                      | Outputs                                                                                               | Invocation                                                       |
+| ----------------------- | ----------------- | --------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `intent_classification` | Intent Classifier | `user_prompt`, `context_kv` | `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` | Always — first node in every execution                           |
+| `task_planning`         | Planner           | `STATE.intent.*`            | `plan.tasks[]`, `plan.routing[]`                                                                      | Always (when `intent_class != "unknown_or_needs_clarification"`) |
 
 ### Core Agent Skills
 
-| Skill | Agent | Inputs | Outputs | Invocation |
-|---|---|---|---|---|
-| `slic_retrieval` | SLIC Agent | Intent entities, task definition | `task.outputs.slic_results`, `task.outputs.annotations` | Conditional — when SLIC data is needed (e.g., `cbp_expert_insights`) |
-| `knowledge_retrieval` | Knowledge Agent | Intent, plan context, conversation history | `task.outputs.enterprise_context`, `task.outputs.retrieval_query` | Conditional — always for `cbp_expert_insights`/`cbp_generic`; conditional for others |
-| `data_query_mcp` | Data Query Agent | `intent_class`, `entities[]`, MCP tool definitions | `task.outputs.assessment_context` | When intent maps to a supported MCP tool |
-| `data_query_sql` | Data Query Agent | `intent_class`, `entities[]`, `schema`, `ontology` | `task.outputs.assessment_context` | When intent is complex/bespoke or MCP unavailable |
+| Skill                 | Agent            | Inputs                                             | Outputs                                                           | Invocation                                                                           |
+| --------------------- | ---------------- | -------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `slic_retrieval`      | SLIC Agent       | Intent entities, task definition                   | `task.outputs.slic_results`, `task.outputs.annotations`           | Conditional — when SLIC data is needed (e.g., `cbp_expert_insights`)                 |
+| `knowledge_retrieval` | Knowledge Agent  | Intent, plan context, conversation history         | `task.outputs.enterprise_context`, `task.outputs.retrieval_query` | Conditional — always for `cbp_expert_insights`/`cbp_generic`; conditional for others |
+| `data_query_mcp`      | Data Query Agent | `intent_class`, `entities[]`, MCP tool definitions | `task.outputs.assessment_context`                                 | When intent maps to a supported MCP tool                                             |
+| `data_query_sql`      | Data Query Agent | `intent_class`, `entities[]`, `schema`, `ontology` | `task.outputs.assessment_context`                                 | When intent is complex/bespoke or MCP unavailable                                    |
 
 ### Domain Agent Skills
 
-| Skill | Agent | Required Upstream | Outputs | Trigger |
-|---|---|---|---|---|
-| `cbp_assessment` | Config Best Practice Agent | Data Query Agent (always), Knowledge Agent (conditional) | `findings[]`, `summary`, `prioritized_risks[]`, `asset_trend[]`, `chart_hints[]` | `intent_class == "cbp_assessment"` |
-| `cbp_expert_insights` | Config Best Practice Agent | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary` | `intent_class == "cbp_expert_insights"` |
-| `cbp_generic` | Config Best Practice Agent | Knowledge Agent (always) | `summary` | `intent_class == "cbp_generic"` |
-| `sec_assessment` | Security Assessment Agent | Data Query Agent (always), Knowledge Agent (conditional) | `findings[]`, `summary`, `prioritized_risks[]` | `intent_class == "sec_assessment"` |
-| `sec_expert_insights` | Security Assessment Agent | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary` | `intent_class == "sec_expert_insights"` |
-| `sec_generic` | Security Assessment Agent | Knowledge Agent (always) | `summary` | `intent_class == "sec_generic"` |
+| Skill                 | Agent                      | Required Upstream                                                        | Outputs                                                                          | Trigger                                 |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------- |
+| `cbp_assessment`      | Config Best Practice Agent | Data Query Agent (always), Knowledge Agent (conditional)                 | `findings[]`, `summary`, `prioritized_risks[]`, `asset_trend[]`, `chart_hints[]` | `intent_class == "cbp_assessment"`      |
+| `cbp_expert_insights` | Config Best Practice Agent | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary`                                                          | `intent_class == "cbp_expert_insights"` |
+| `cbp_generic`         | Config Best Practice Agent | Knowledge Agent (always)                                                 | `summary`                                                                        | `intent_class == "cbp_generic"`         |
+| `sec_assessment`      | Security Assessment Agent  | Data Query Agent (always), Knowledge Agent (conditional)                 | `findings[]`, `summary`, `prioritized_risks[]`                                   | `intent_class == "sec_assessment"`      |
+| `sec_expert_insights` | Security Assessment Agent  | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary`                                                          | `intent_class == "sec_expert_insights"` |
+| `sec_generic`         | Security Assessment Agent  | Knowledge Agent (always)                                                 | `summary`                                                                        | `intent_class == "sec_generic"`         |
 
 ### Supporting Agent Skills (TBD)
 
-| Skill | Agent | Purpose |
-|---|---|---|
-| `answer_reflection` | Reflector | Critique and refine task results for quality |
-| `context_summarization` | Context Pruner | Summarize conversation to mitigate semantic bloat |
-| `context_recovery` | Context Recovery | Recover missing context in multi-turn scenarios |
+| Skill                   | Agent            | Purpose                                           |
+| ----------------------- | ---------------- | ------------------------------------------------- |
+| `answer_reflection`     | Reflector        | Critique and refine task results for quality      |
+| `context_summarization` | Context Pruner   | Summarize conversation to mitigate semantic bloat |
+| `context_recovery`      | Context Recovery | Recover missing context in multi-turn scenarios   |
 
 ### Skill Selection Logic
 
@@ -177,20 +177,20 @@ Each agent produces and consumes well-defined data artifacts.
 - `routing[]` — agent-to-task mapping
 
 **Core Agents produce (per task):**
-| Agent | Output Artifact | Description |
-|---|---|---|
-| SLIC Agent | `slic_results`, `annotations` | SLIC assessment results and annotations |
-| Knowledge Agent | `enterprise_context`, `retrieval_query` | RAG-retrieved policies, standards, exceptions + the query used |
-| Data Query Agent | `assessment_context` | Normalized device/network data (via MCP tools or SQL) |
+| Agent            | Output Artifact                         | Description                                                    |
+| ---------------- | --------------------------------------- | -------------------------------------------------------------- |
+| SLIC Agent       | `slic_results`, `annotations`           | SLIC assessment results and annotations                        |
+| Knowledge Agent  | `enterprise_context`, `retrieval_query` | RAG-retrieved policies, standards, exceptions + the query used |
+| Data Query Agent | `assessment_context`                    | Normalized device/network data (via MCP tools or SQL)          |
 
 **Domain Agents produce (per task):**
-| Output Artifact | Description |
-|---|---|
-| `findings[]` | Structured findings with severity, confidence, evidence |
-| `summary` | Natural language summary of analysis |
-| `prioritized_risks[]` | Risk-ranked findings |
-| `asset_trend[]` | Trend/delta analysis (Config Best Practice Agent, trend mode) |
-| `chart_hints[]` | Chart-ready data metadata for UI rendering (optional) |
+| Output Artifact       | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
+| `findings[]`          | Structured findings with severity, confidence, evidence       |
+| `summary`             | Natural language summary of analysis                          |
+| `prioritized_risks[]` | Risk-ranked findings                                          |
+| `asset_trend[]`       | Trend/delta analysis (Config Best Practice Agent, trend mode) |
+| `chart_hints[]`       | Chart-ready data metadata for UI rendering (optional)         |
 
 ### 4.3 Example Data Flows by Skill
 
@@ -231,20 +231,20 @@ The remaining skills (`cbp_generic`, `sec_assessment`, `sec_expert_insights`, `s
 
 ## 5. Data Sources
 
-| Data Source | Accessed By | Contains |
-|---|---|---|
-| **SLIC DB / Engine** | SLIC Agent | SLIC assessment results, annotations |
-| **Vector DB** | Knowledge Agent | Human annotations, institutional knowledge, policies, standards, approved exceptions |
-| **Trino DB** | Data Query Agent | Assessment metadata, raw configuration data, schema cache, runtime context |
-| **MCP Tools** | Data Query Agent | `assessment_analysis_tool`, `assessment_comparison_tool`, `issue_tracking_tool` — predefined queries for common assessment operations |
+| Data Source          | Accessed By      | Contains                                                                                                                              |
+| -------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **SLIC DB / Engine** | SLIC Agent       | SLIC assessment results, annotations                                                                                                  |
+| **Vector DB**        | Knowledge Agent  | Human annotations, institutional knowledge, policies, standards, approved exceptions                                                  |
+| **Trino DB**         | Data Query Agent | Assessment metadata, raw configuration data, schema cache, runtime context                                                            |
+| **MCP Tools**        | Data Query Agent | `assessment_analysis_tool`, `assessment_comparison_tool`, `issue_tracking_tool` — predefined queries for common assessment operations |
 
 ### Data Query Agent: Dual-Path Retrieval
 
 The DQA has two retrieval strategies, selected deterministically:
 
-| Path | When Used | How It Works |
-|---|---|---|
-| **MCP Path** | Intent maps to a supported MCP tool | Select tool by intent_class + entities → execute → normalize results |
+| Path         | When Used                                  | How It Works                                                                  |
+| ------------ | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| **MCP Path** | Intent maps to a supported MCP tool        | Select tool by intent_class + entities → execute → normalize results          |
 | **SQL Path** | Complex/bespoke intent, or MCP unavailable | Read schema + ontology → generate read-only SQL → execute → normalize results |
 
 ---
@@ -269,13 +269,13 @@ There is **no replanning** in the current architecture. If data is insufficient,
 
 The Planner invokes agents by skill, based on the domain skill's data dependencies (see §2 Skill Catalog):
 
-| Agent | Skill(s) | Invocation Rule |
-|---|---|---|
-| **SLIC Agent** | `slic_retrieval` | When SLIC data is needed (e.g., `cbp_expert_insights`, `sec_expert_insights`) |
-| **Knowledge Agent** | `knowledge_retrieval` | Always for `*_expert_insights` and `*_generic`; conditional for `*_assessment` |
-| **Data Query Agent** | `data_query_mcp` or `data_query_sql` | Always for `*_assessment` and `*_expert_insights`; never for `*_generic` |
-| **CBP Agent** | `cbp_assessment`, `cbp_expert_insights`, or `cbp_generic` | When `intent_class` ∈ {`cbp_assessment`, `cbp_expert_insights`, `cbp_generic`} |
-| **SA Agent** | `sec_assessment`, `sec_expert_insights`, or `sec_generic` | When `intent_class` ∈ {`sec_assessment`, `sec_expert_insights`, `sec_generic`} |
+| Agent                | Skill(s)                                                  | Invocation Rule                                                                |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **SLIC Agent**       | `slic_retrieval`                                          | When SLIC data is needed (e.g., `cbp_expert_insights`, `sec_expert_insights`)  |
+| **Knowledge Agent**  | `knowledge_retrieval`                                     | Always for `*_expert_insights` and `*_generic`; conditional for `*_assessment` |
+| **Data Query Agent** | `data_query_mcp` or `data_query_sql`                      | Always for `*_assessment` and `*_expert_insights`; never for `*_generic`       |
+| **CBP Agent**        | `cbp_assessment`, `cbp_expert_insights`, or `cbp_generic` | When `intent_class` ∈ {`cbp_assessment`, `cbp_expert_insights`, `cbp_generic`} |
+| **SA Agent**         | `sec_assessment`, `sec_expert_insights`, or `sec_generic` | When `intent_class` ∈ {`sec_assessment`, `sec_expert_insights`, `sec_generic`} |
 
 ### 6.3 Memory
 
@@ -369,12 +369,12 @@ flowchart TD
 
 This logical view is deliberately deployment-agnostic. The following concerns are addressed in other documents:
 
-| Concern | Document |
-|---|---|
-| How agents are deployed (services vs. graph nodes) | [deployment_options.md](deployment_options.md) |
-| Whether core agents are shared or duplicated per domain | [deployment_options.md](deployment_options.md) |
-| Communication protocol (A2A, HTTP, shared state) | [deployment_options.md](deployment_options.md) |
-| Scaling, containers, process boundaries | [deployment_options.md](deployment_options.md) |
-| SOA vs. LOA architectural strategy | [Architectural Strategy v4.md](Architectural%20Strategy%20v4.md) |
-| Graph transition rules and edge conditions | [graph/graph_flow.md](graph/graph_flow.md) |
-| Individual agent contracts (full detail) | [agents/*.md](agents/) |
+| Concern                                                 | Document                                                         |
+| ------------------------------------------------------- | ---------------------------------------------------------------- |
+| How agents are deployed (services vs. graph nodes)      | [deployment_options.md](deployment_options.md)                   |
+| Whether core agents are shared or duplicated per domain | [deployment_options.md](deployment_options.md)                   |
+| Communication protocol (A2A, HTTP, shared state)        | [deployment_options.md](deployment_options.md)                   |
+| Scaling, containers, process boundaries                 | [deployment_options.md](deployment_options.md)                   |
+| SOA vs. LOA architectural strategy                      | [Architectural Strategy v4.md](Architectural%20Strategy%20v4.md) |
+| Graph transition rules and edge conditions              | [graph/graph_flow.md](graph/graph_flow.md)                       |
+| Individual agent contracts (full detail)                | [agents/*.md](agents/)                                           |
