@@ -1,7 +1,8 @@
 # Deployment Options: Multi-Agent Services vs. Graph-Embedded Agents
 
 **Purpose:** Compare two implementation approaches for the Assessment Agentic Architecture.
-**Date:** 2026-02-27
+**Version:** v1.0  
+**Date:** 2026-03-13
 
 ---
 
@@ -30,91 +31,45 @@ Each agent runs as an **independent service** with its own runtime. A central Su
 
 ```
                     ┌───────────────────────┐
-                    │ Semantic Router /      │
-                    │ Intent Classifier      │
-                    │ Agent                  │
+                    │ Semantic Router /     │
+                    │ Intent Classifier     │
+                    │ Agent                 │
                     └──────────┬────────────┘
                                ▼
-                    ┌───────────────────────┐       ┌─────────┐
-                    │ Supervisor / Planner  │       │         │
-                    │ Agent                 │◄─────▶│ Memory  │
-                    └──┬─────┬─────┬───────┘       └─────────┘
-          ┌────────────┤     │     ├────────────────────┐
-          ▼            ▼     ▼     ▼                    ▼
-   ┌────────────┐ ┌─────────────────┐ ┌──────────────────┐   ┌──────────────────────────────┐
-   │ SLIC Agent │ │ Knowledge       │ │ Data Query       │   │ Config Best Practice         │
-   │            │ │ Agent           │ │ Agent            │   │ Domain Agent                 │
-   └──────┬─────┘ └────────┬────────┘ └────────┬─────────┘   └──────────────┬───────────────┘
-          ▼            ▼           ▼                   │
-   ┌──────────┐ ┌──────────┐ ┌──────────┐             │
-   │ SLIC DB  │ │Vector DB │ │ Trino DB │             │
-   └──────────┘ └──────────┘ └──────────┘             │
-                                                       ▼
-                                            ┌──────────────────────┐
-                                            │ Security Assessment  │
-                                            │ Agent                │
-                                            └──────────────────────┘
+                    ┌───────────────────────┐ 
+                    │ Supervisor / Planner  │
+                    │ Agent                 │
+                    └───────────┬───────────┘       
+                                │
+          ┌─────────┬───────────┼────────────┬─────────────────┐
+          │         │           │            │                 │
+          ▼         ▼           ▼            ▼                 ▼
+   ┌────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐ ┌──────────────┐
+   │ SLIC       │ │Knowledge │ │Data Query│ │Config Best   │ │Security      │
+   │ Agent      │ │Agent     │ │Agent     │ │Practice Agent│ │Assessment    │
+   │            │ │          │ │          │ │              │ │Agent         │
+   └──────┬─────┘ └────┬─────┘ └────┬─────┘ └──────────────┘ └──────────────┘
+          ▼            ▼            ▼
+   ┌──────────┐  ┌──────────┐ ┌──────────┐
+   │ SLIC DB  │  │Vector DB │ │ Trino DB │
+   └──────────┘  └──────────┘ └──────────┘
+
+   All agent connections to Planner are bidirectional (◄──▶):
+   Planner sends task requests, agents return task results.
 
    ┌─────────────────────────────────────────────────────┐
    │ Supporting Agents (TBD):                            │
-   │ Ambiguity Handler, Reflector, Context Pruner,       │
-   │ Context Recovery                                    │
+   │ Reflector, Context Pruner, Context Recovery         │
    └─────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow (Option 1)
 
+The execution flow for both options follows the single-pass Planner/Execute model defined in [logical_architecture.md §6.1](logical_architecture.md). The options differ in how that flow is realized at runtime, not in the flow itself.
+
 In this model, the Planner **assembles state from individual agent responses** across service boundaries. There is no shared in-memory state object — each agent receives a request payload and returns a response payload. The Planner composes the full picture.
 
-```
-User prompt
-    │
-    ▼
-┌──────────────────────────────────┐
-│ Intent Classifier Agent          │  ← receives: user_prompt, context_kv
-│ (service call)                   │  → returns: intent_class, entities[], confidence
-└──────────────────┬───────────────┘
-                   │ Planner receives intent response
-                   ▼
-┌──────────────────────────────────┐
-│ Planner Agent                    │  ← reads: intent response + Memory
-│ (builds task plan)               │  → emits: task plan with agent assignments
-└──────────────────┬───────────────┘
-                   │ Delegates tasks via service calls
-          ┌────────┼────────┐
-          ▼        ▼        ▼
-    ┌──────────┐ ┌─────────────────┐ ┌──────────────────┐
-    │ SLIC     │ │ Knowledge       │ │ Data Query       │   Each agent receives a task request
-    │ Agent    │ │ Agent           │ │ Agent            │   and returns task outputs
-    └────┬─────┘ └────────┬────────┘ └────────┬─────────┘
-         │          │        │
-         ▼          ▼        ▼        Planner collects responses
-┌──────────────────────────────────┐
-│ Planner composes context from    │  ← assembles: SLIC results + enterprise_context
-│ Core Agent responses             │    + assessment_context into domain task request
-└──────────────────┬───────────────┘
-                   │ Delegates to Domain Agent
-                   ▼
-         ┌──────────────────┐
-         │ Domain Agent     │  ← receives: composed context (assessment_context,
-         │ (service call)   │    enterprise_context, SLIC results, intent)
-         └────────┬─────────┘  → returns: findings[], summary, prioritized_risks[]
-                  │
-                  ▼
-          Final response to user
-```
-
 **Key mechanism:** The Planner controls what data each agent sees. It selects which upstream outputs to include in each service call payload — providing natural context management (an agent only receives what the Planner explicitly sends).
-
-**Data contract per service call:**
-
-| Service Call | Request Payload | Response Payload |
-|---|---|---|
-| Intent Classifier | `user_prompt`, `context_kv` | `intent_class`, `meta_intent`, `entities[]`, `confidence`, `clarification_question` |
-| SLIC Agent | Task definition, intent entities | `slic_results`, `annotations` |
-| Knowledge Agent | Task definition, intent, conversation history | `enterprise_context`, `retrieval_query` |
-| Data Query Agent | Task definition, intent entities, schema/ontology | `assessment_context` |
-| Domain Agent | Task definition, composed upstream outputs (assessment_context, enterprise_context, SLIC results) | `findings[]`, `summary`, `prioritized_risks[]`, `chart_hints[]` |
 
 ### Key Characteristics
 
@@ -138,27 +93,27 @@ The key insight: rather than one platform-wide graph or one platform-wide multi-
 
 ```
   ┌──────────────────────────────────────────────────────────────────────────────────────────┐
-  │  Config Best Practice Domain Graph Instance                                             │
+  │  Config Best Practice Domain Graph Instance                                              │
   │                                                                                          │
-  │  ┌──────────────────────────────────────────┐                                            │
-  │  │ Config Best Practice Intent_Classifier   │                                            │
-  │  │ Node                                     │                                            │
-  │  └─────────────────────┬────────────────────┘                                            │
-  │                        ▼                                                                  │
-  │  ┌──────────────────────────────────────────┐       ┌─────────┐                          │
-  │  │ Supervisor / Planner Node                │◄─────▶│ Memory  │                          │
-  │  └──┬──────────────────┬────────────────┬───┘       └─────────┘                          │
-  │     │                  │                │                                                 │
-  │     ▼                  ▼                ▼                                                 │
+  │  ┌───────────────────────────────────────────┐                                           │
+  │  │ Config Best Practice Intent_Classifier    │                                           │
+  │  │ Node                                      │                                           │
+  │  └─────────────────────┬─────────────────────┘                                           │
+  │                        ▼                                                                 │
+  │  ┌────────────────────────────────────────────┐                                          │
+  │  │ Supervisor / Planner Node                  │                                          │
+  │  └──┬──────────────────┬────────────────┬───┬─┘                                          │
+  │     │                  │                │   |─────────────────┐                          │
+  │     ▼                  ▼                ▼                     ▼                          │
   │  ┌────────┐ ┌─────────────────┐ ┌──────────────────┐ ┌──────────────────────────────┐    │
   │  │ SLIC   │ │ Knowledge       │ │ Data Query       │ │ Config Best Practice         │    │
   │  │ Node   │ │ Agent Node      │ │ Agent Node       │ │ Domain Task Agent Node       │    │
   │  └───┬────┘ └────────┬────────┘ └────────┬─────────┘ └──────────────────────────────┘    │
-  │      │               │                   │                                                │
-  │      ▼           ┌───┘                   ▼           All nodes share one                  │
-  │  ┌────────┐      ▼              ┌────────┐           GraphState. No network               │
-  │  │SLIC DB │   VectorDB          │Trino DB│           boundaries.                          │
-  │  └────────┘                     └────────┘                                                │
+  │      │               │                   │                                               │
+  │      ▼               ▼                   ▼              All nodes share one              │
+  │  ┌────────┐   ┌──────────┐            ┌────────┐        GraphState. No network           │
+  │  │SLIC DB │   │ VectorDB │            │Trino DB│        boundaries.                      │
+  │  └────────┘   └──────────┘            └────────┘                                         │
   └──────────────────────────────────────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────────────────────────────────┐
@@ -167,74 +122,16 @@ The key insight: rather than one platform-wide graph or one platform-wide multi-
   └──────────────────────────────────────────────────────────────────────────────────────────┘
 
   Supporting Nodes (TBD) included per graph:
-  Reflector, Ambiguity Handler, Context Pruner, Context Recovery
+  Reflector, Context Pruner, Context Recovery
 ```
 
 ### Data Flow (Option 2)
 
+The execution flow for both options follows the single-pass Planner/Execute model defined in [logical_architecture.md §6.1](logical_architecture.md). The options differ in how that flow is realized at runtime, not in the flow itself.
+
 In this model, all nodes within a domain graph **share a single GraphState object** in memory. Each node writes to its designated section(s) of the state directly — there are no network calls or serialization between nodes within a graph.
 
-```
-GraphState (shared in-memory object within one domain graph)
-├── input
-│   ├── user_prompt              ← External input
-│   └── context_kv               ← Optional key-value context
-├── intent
-│   ├── intent_class             ← Intent Classifier Node writes
-│   ├── meta_intent              ← Intent Classifier Node writes
-│   ├── domain_details           ← Intent Classifier Node writes
-│   ├── entities[]               ← Intent Classifier Node writes
-│   ├── confidence               ← Intent Classifier Node writes
-│   └── clarification_question   ← Intent Classifier Node writes (only when ambiguous)
-├── plan
-│   ├── tasks[]                  ← Planner Node writes
-│   │   └── [each task]
-│   │       ├── id, description, owner, depends_on[], status
-│   │       ├── required_data[]      ← Planner Node declares
-│   │       └── outputs              ← Executing node writes
-│   │           ├── slic_results         (SLIC Agent Node)
-│   │           ├── enterprise_context   (Knowledge Agent Node)
-│   │           ├── retrieval_query      (Knowledge Agent Node)
-│   │           ├── assessment_context   (Data Query Agent Node)
-│   │           ├── findings[]           (Domain Task Agent Node)
-│   │           ├── summary              (Domain Task Agent Node)
-│   │           ├── prioritized_risks[]  (Domain Task Agent Node)
-│   │           ├── asset_trend[]        (Domain Task Agent Node, trend mode)
-│   │           └── chart_hints[]        (Domain Task Agent Node, optional)
-│   └── routing[]                ← Planner Node writes
-├── schema                       ← Pre-loaded (for Data Query Agent SQL path)
-├── ontology                     ← Pre-loaded (for Data Query Agent SQL path)
-├── conversation
-│   └── history[]                ← Multi-turn context (future)
-└── trace
-    ├── node_run_order[]         ← All nodes append
-    └── state_deltas[]           ← All nodes append
-```
-
-**Execution flow within a domain graph:**
-
-```
-User prompt enters graph
-    │
-    ▼
-Intent Classifier Node ──▶ writes to GraphState.intent.*
-    │
-    ▼
-Planner Node ──▶ reads GraphState.intent.*, writes GraphState.plan.*
-    │
-    ├──▶ SLIC Agent Node ──▶ reads GraphState.plan/intent, writes task.outputs.slic_results
-    ├──▶ Knowledge Agent Node ──▶ reads GraphState.plan/intent, writes task.outputs.enterprise_context
-    ├──▶ Data Query Agent Node ──▶ reads GraphState.plan/intent/schema/ontology, writes task.outputs.assessment_context
-    │
-    ▼
-Domain Task Agent Node ──▶ reads all upstream task.outputs from GraphState
-                        ──▶ writes task.outputs.findings[], summary, prioritized_risks[]
-    │
-    ▼
-Graph returns final GraphState
-```
-
-**Key mechanism:** All nodes see the full GraphState — there is no Planner-mediated context selection. Each node reads what it needs directly from the shared object and writes to its designated section(s). Context pruning, if needed, must be done explicitly (e.g., by a Context Pruner node).
+**Key mechanism:** All nodes see the full GraphState — there is no Planner-mediated context selection. Each node reads what it needs directly from the shared object and writes to its designated section(s).
 
 ### Key Characteristics
 
@@ -246,7 +143,7 @@ Graph returns final GraphState
 - **Scaling unit is the entire domain graph** — individual nodes (e.g., Knowledge Agent, Data Query Agent) cannot be scaled independently within a graph
 - **An external routing layer is required** — since each domain has its own graph with a domain-scoped Intent Classifier, an external component must route incoming prompts to the correct domain graph
 - **Sub-graph variation:** Core Agents and the Domain Task Agent can each be built as sub-graphs rather than flat nodes, giving each agent its own internal graph structure while remaining invocable as a single node from the Planner's perspective
-- Supporting Nodes (Reflector, Ambiguity Handler, Context Pruner, Context Recovery) are included per graph — all TBD
+- Supporting Nodes (Reflector, Context Pruner, Context Recovery) are included per graph — all TBD
 
 ---
 
@@ -257,8 +154,7 @@ Graph returns final GraphState
 | **Deployment**             | Multiple services/containers — deploy, scale, version independently           | One graph deployment per domain — add a domain = deploy a new graph instance                                |
 | **Communication**          | Cross-process (A2A, RemoteGraph)                                              | Intra-graph (shared state, function calls); cross-domain requires an external router                        |
 | **Latency**                | Higher — network hops between Planner and each agent                          | Lower within a domain graph — no serialization, no network overhead                                         |
-| **State Management**       | Each agent manages its own internal state in isolation; the Planner assembles cross-agent context by composing upstream outputs into request payloads | Native shared `GraphState` per graph — all nodes read/write designated sections                              |
-| **Context Management**     | Each agent manages its own context window independently; cross-agent context is composed explicitly by the Planner into request payloads | All nodes see the full GraphState; context window is managed at the graph and node level                     |
+| **State & Context Management** | Each agent manages its own state in isolation; the Planner assembles cross-agent context by composing upstream outputs into request payloads — an agent only sees what the Planner explicitly sends | Native shared `GraphState` per graph — all nodes read/write designated sections; all nodes see the full state |
 | **Scaling**                | Per-agent scaling                                                             | Per-domain-graph scaling                                                                                    |
 | **Core Agent Sharing**     | Shared Core Agents serve all Domain Agents — single Knowledge Agent, single Data Query Agent, single SLIC | Core nodes (SLIC, Knowledge Agent, Data Query Agent) are duplicated in each domain graph |
 | **Domain Extensibility**   | Add a new Domain Agent as a new service                                       | Add a new domain graph instance                                                                             |

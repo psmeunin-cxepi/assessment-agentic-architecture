@@ -304,13 +304,14 @@ The Planner invokes agents by skill, based on the domain skill's data dependenci
 
 ### 6.3 Memory
 
-Memory is accessible to all agents. It contains:
+Memory is accessible to all agents. 
+It contains:
 - **Conversation history** — multi-turn context
 - **Personalization** — user preferences and context
 - **Self-corrections** — prior corrections applied during the session
 - **Agent memory** — learned patterns from prior executions
 
-Each agent may read conversation history, prior corrections, and relevant context from Memory to inform its execution. How Memory is shared across agents — whether via a shared state object, injected context, or other mechanism — is an implementation concern. Per-agent Memory usage patterns are documented in the individual agent contracts (`agents/*.md`).
+Each agent may read conversation history, prior corrections, and relevant context from Memory to inform its execution. How Memory is shared across agents — whether via a shared state object, injected context, or other mechanism — is an implementation concern. Per-agent Memory usage patterns are documented in the individual agent contracts.
 
 Memory is not a separate agent.
 
