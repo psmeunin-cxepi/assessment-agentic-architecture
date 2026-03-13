@@ -4,6 +4,10 @@
 **Version:** v0.3.  
 **Date:** 2026-03-13.
 
+**Relationship to other documents:**
+- [logical_architecture.md](logical_architecture.md) — the **logical view**: what agents exist, their skills, relationships, and data flows (deployment-independent)
+- [agent_capability_architecture.md](agent_capability_architecture.md) — the **capability view**: how agents acquire capabilities (static composition vs. dynamic skills, SOA vs. LOA)
+
 ---
 
 ## Overview
