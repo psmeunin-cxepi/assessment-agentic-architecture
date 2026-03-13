@@ -2,7 +2,7 @@
 
 **Purpose:** Define the logical view of the Assessment Agentic Architecture — the agents, their responsibilities, relationships, and data flows. This view is **deployment-independent**: it describes *what* agents exist and *how* they interact, not *where* or *how* they run.
 
-**Version:** v1.0  
+**Version:** v0.5  
 **Date:** 2026-03-13
 
 **Relationship to other documents:**
