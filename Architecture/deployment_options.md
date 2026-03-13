@@ -178,7 +178,7 @@ This path phases the deployment from a single self-contained graph to a service-
 
 This produces a convergence: **Option 2 for domain isolation + Option 1 for core agent sharing** — each domain deploys its own graph, but Core Agents are centralized services consumed by all domain graphs.
 
-This aligns with the **Migration Policy** in [Architectural Strategy v4](Architectural%20Strategy%20v4.md) §5.3: start contained, extract services when evidence (duplication cost, scaling needs, consistency requirements) justifies it.
+This aligns with the **Migration Policy** in [Agent Capability Architecture](agent_capability_architecture.md) §5.3: start contained, extract services when evidence (duplication cost, scaling needs, consistency requirements) justifies it.
 
 ### Open Questions
 
