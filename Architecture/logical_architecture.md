@@ -1,6 +1,7 @@
 # Logical Architecture: Assessment Agentic AI
 
-**Purpose:** Define the logical view of the Assessment Agentic Architecture — the agents, their responsibilities, relationships, and data flows. This view is **deployment-independent**: it describes *what* agents exist and *how* they interact, not *where* or *how* they run.
+**Purpose:** Define the logical view of the Assessment Agentic Architecture — the agents, their responsibilities, relationships, and data flows.  
+This view is **deployment-independent**: it describes *what* agents exist and *how* they interact, not *where* or *how* they run.
 
 **Version:** v0.5  
 **Date:** 2026-03-13

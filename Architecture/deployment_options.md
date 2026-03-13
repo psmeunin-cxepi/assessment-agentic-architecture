@@ -1,8 +1,8 @@
 # Deployment Options: Multi-Agent Services vs. Graph-Embedded Agents
 
-**Purpose:** Compare two implementation approaches for the Assessment Agentic Architecture.
-**Version:** v1.0  
-**Date:** 2026-03-13
+**Purpose:** Compare two implementation approaches for the Assessment Agentic Architecture.  
+**Version:** v0.3.  
+**Date:** 2026-03-13.
 
 ---
 
