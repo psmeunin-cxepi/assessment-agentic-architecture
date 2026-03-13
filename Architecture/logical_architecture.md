@@ -8,7 +8,7 @@ This view is **deployment-independent**: it describes *what* agents exist and *h
 
 **Relationship to other documents:**
 - [deployment_options.md](deployment_options.md) — the **deployment/physical view**: how these logical agents are mapped to runtime (services vs. graph nodes)
-- [agents/*.md](agents/) — the **agent contracts**: detailed persona, inputs, outputs, and rules per agent
+- [agent_capability_architecture.md](agent_capability_architecture.md) — the **capability view**: how agents acquire capabilities (static composition vs. dynamic skills, SOA vs. LOA)
 
 ---
 
