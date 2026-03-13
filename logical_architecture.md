@@ -236,16 +236,37 @@ The remaining skills (`cbp_generic`, `sec_assessment`, `sec_expert_insights`, `s
 | **SLIC DB / Engine** | SLIC Agent       | SLIC assessment results, annotations                                                                                                  |
 | **Vector DB**        | Knowledge Agent  | Human annotations, institutional knowledge, policies, standards, approved exceptions                                                  |
 | **Trino DB**         | Data Query Agent | Assessment metadata, raw configuration data, schema cache, runtime context                                                            |
-| **MCP Tools**        | Data Query Agent | `assessment_analysis_tool`, `assessment_comparison_tool`, `issue_tracking_tool` — predefined queries for common assessment operations |
+| **MCP Tools**        | Data Query Agent | Configurations MCP Server — domain-first, parameterized tools covering the full Config Best Practice data surface |
 
 ### Data Query Agent: Dual-Path Retrieval
 
-The DQA has two retrieval strategies, selected deterministically:
+The Data Query Agent has two retrieval strategies, selected deterministically:
 
 | Path         | When Used                                  | How It Works                                                                  |
 | ------------ | ------------------------------------------ | ----------------------------------------------------------------------------- |
 | **MCP Path** | Intent maps to a supported MCP tool        | Select tool by intent_class + entities → execute → normalize results          |
 | **SQL Path** | Complex/bespoke intent, or MCP unavailable | Read schema + ontology → generate read-only SQL → execute → normalize results |
+
+> **Constraint:** For the Config Best Practice domain, the MCP path must provide complete data coverage — the SQL path is a migration bridge only. See §7 invariant #11.
+
+### MCP Tool Design: Parameterized Approach
+
+The MCP tool surface follows a **parameterized approach** — a small number of domain-scoped tools with rich parameter schemas — rather than a many-specific-tools approach where each query pattern gets its own dedicated tool.
+
+| Approach | Description | Trade-off |
+|----------|-------------|-----------|
+| **Many specific tools** | One tool per query pattern (e.g., `get_risk_by_product_family`, `get_trend_by_technology`, `get_findings_by_severity`) | Explicit and easy to test, but rigid — every new query pattern requires a new tool, leading to tool sprawl and combinatorial explosion as filter/grouping dimensions grow |
+| **Few parameterized tools** (adopted) | Small number of tools with rich parameter schemas — `view_mode`, `group_by`, `metrics`, `filters`, `asset_scope` control what data is returned and how it is shaped | Covers the full combinatorial space of filters, aggregations, and groupings without tool proliferation; parameter validation replaces tool selection as the complexity surface |
+
+**Why parameterized is preferred:**
+
+1. **Combinatorial coverage** — Config Best Practice queries combine arbitrary filters (severity, product family, technology, OS), aggregation modes (count, distribution, top-N), and grouping dimensions. Parameterized tools cover these combinations through parameter composition rather than requiring a dedicated tool for each permutation.
+2. **Reduced tool selection burden on the LLM** — fewer tools means simpler tool-selection reasoning for the Data Query Agent. Instead of choosing among dozens of narrow tools, the agent selects one of a few domain tools and expresses intent through parameters.
+3. **Stable tool surface** — new query patterns (new filters, new grouping dimensions) are added as parameter values, not new tools. The tool contract remains stable as the data model evolves.
+4. **Consistent response envelope** — all parameterized tools share a common response structure, enabling deterministic multi-tool result merging in agent memory.
+5. **Testability at the parameter level** — each tool's parameter space is validated with explicit enums, allow-lists, and incompatible-parameter rules. Coverage is verified by mapping canonical questions to specific tool + parameter combinations.
+
+The current Config Best Practice MCP tool surface implements four parameterized tools: `search_assets_scope` (asset-dimension filter resolution), `query_findings` (finding records, aggregates, execution overview), `query_rules` (rule catalog and impact), and `query_insights` (AI-generated insights). See the [Configurations MCP Server Design Overview](https://cisco-cxe.atlassian.net/wiki/spaces/CIA/pages/1066008593) for detailed tool contracts and question-to-tool mappings.
 
 ---
 
@@ -303,6 +324,7 @@ These properties hold true for the logical architecture:
 8. **Planner never fetches data** — it orchestrates, delegates, and aggregates
 9. **Intent Classifier never plans** — it classifies and extracts, nothing more
 10. **Trace provenance** — every agent appends execution trace for observability
+11. **MCP tools cover the full domain data surface** — MCP tools must cover 100% of the Config Best Practice data domain. The SQL path exists only as a migration bridge or for non-Config Best Practice domains. For Config Best Practice in Q3 GA, every answerable user prompt must be serviceable through MCP tools alone.
 
 ---
 

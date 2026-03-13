@@ -1,4 +1,4 @@
-# Agent Capability Architecture: From Static Composition to Dynamic Skills
+# Agent Capability Architecture: From Static Composition to Dynamic Skills (draft, under construction)
 
 **Purpose:** Define how agents in the Assessment Agentic Architecture acquire and compose their capabilities — from today's static, hand-wired approach to a future where capabilities are packaged as portable Agent Skills and loaded dynamically from a registry.
 
