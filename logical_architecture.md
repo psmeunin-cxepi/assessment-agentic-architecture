@@ -2,7 +2,8 @@
 
 **Purpose:** Define the logical view of the Assessment Agentic Architecture — the agents, their responsibilities, relationships, and data flows. This view is **deployment-independent**: it describes *what* agents exist and *how* they interact, not *where* or *how* they run.
 
-**Date:** 2026-02-27
+**Version:** v1.0  
+**Date:** 2026-03-13
 
 **Relationship to other documents:**
 - [deployment_options.md](deployment_options.md) — the **deployment/physical view**: how these logical agents are mapped to runtime (services vs. graph nodes)
@@ -50,6 +51,8 @@ The architecture defines four categories of agents. All agents are LLM-powered w
 
 > The Ambiguity Handler is **not a separate agent** — ambiguity is handled by the Intent Classifier's `intent_classification` skill (clarification gate).
 
+> Supporting agents are not yet scoped. Their placement in the execution flow (e.g., Reflector's impact on the single-pass constraint, Guardrails input/output filtering position) will be defined when these agents are scoped.
+
 ---
 
 ## 2. Skill Catalog
@@ -60,28 +63,28 @@ Skills are the universal unit of capability across the architecture. Every agent
 
 | Skill                   | Agent             | Inputs                      | Outputs                                                                                               | Invocation                                                       |
 | ----------------------- | ----------------- | --------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `intent_classification` | Intent Classifier | `user_prompt`, `context_kv` | `intent_class`, `meta_intent`, `domain_details`, `entities[]`, `confidence`, `clarification_question` | Always — first node in every execution                           |
-| `task_planning`         | Planner           | `STATE.intent.*`            | `plan.tasks[]`, `plan.routing[]`                                                                      | Always (when `intent_class != "unknown_or_needs_clarification"`) |
+| `intent_classification` | Intent Classifier | User prompt, conversation context | Intent classification, meta-intent, domain details, extracted entities, confidence score, clarification question (if ambiguous) | Always — first node in every execution                           |
+| `task_planning`         | Planner           | Classified intent output         | Ordered task list with agent assignments and dependencies, agent-to-task routing                                                | Always (when intent is not ambiguous)                            |
 
 ### Core Agent Skills
 
-| Skill                 | Agent            | Inputs                                             | Outputs                                                           | Invocation                                                                           |
-| --------------------- | ---------------- | -------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `slic_retrieval`      | SLIC Agent       | Intent entities, task definition                   | `task.outputs.slic_results`, `task.outputs.annotations`           | Conditional — when SLIC data is needed (e.g., `cbp_expert_insights`)                 |
-| `knowledge_retrieval` | Knowledge Agent  | Intent, plan context, conversation history         | `task.outputs.enterprise_context`, `task.outputs.retrieval_query` | Conditional — always for `cbp_expert_insights`/`cbp_generic`; conditional for others |
-| `data_query_mcp`      | Data Query Agent | `intent_class`, `entities[]`, MCP tool definitions | `task.outputs.assessment_context`                                 | When intent maps to a supported MCP tool                                             |
-| `data_query_sql`      | Data Query Agent | `intent_class`, `entities[]`, `schema`, `ontology` | `task.outputs.assessment_context`                                 | When intent is complex/bespoke or MCP unavailable                                    |
+| Skill                 | Agent            | Inputs                                                  | Outputs                                                      | Invocation                                                                           |
+| --------------------- | ---------------- | ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `slic_retrieval`      | SLIC Agent       | Intent entities, task definition                        | SLIC assessment results, annotations                         | Conditional — when SLIC data is needed (e.g., `cbp_expert_insights`)                 |
+| `knowledge_retrieval` | Knowledge Agent  | Intent, plan context, conversation history              | Enterprise context (policies, standards, exceptions), retrieval query used | Conditional — always for `cbp_expert_insights`/`cbp_generic`; conditional for others |
+| `data_query_mcp`      | Data Query Agent | Intent classification, extracted entities, MCP tool definitions | Assessment context (normalized device/network data)          | When intent maps to a supported MCP tool                                             |
+| `data_query_sql`      | Data Query Agent | Intent classification, extracted entities, schema, ontology     | Assessment context (normalized device/network data)          | When intent is complex/bespoke or MCP unavailable                                    |
 
 ### Domain Agent Skills
 
-| Skill                 | Agent                      | Required Upstream                                                        | Outputs                                                                          | Trigger                                 |
-| --------------------- | -------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------- |
-| `cbp_assessment`      | Config Best Practice Agent | Data Query Agent (always), Knowledge Agent (conditional)                 | `findings[]`, `summary`, `prioritized_risks[]`, `asset_trend[]`, `chart_hints[]` | `intent_class == "cbp_assessment"`      |
-| `cbp_expert_insights` | Config Best Practice Agent | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary`                                                          | `intent_class == "cbp_expert_insights"` |
-| `cbp_generic`         | Config Best Practice Agent | Knowledge Agent (always)                                                 | `summary`                                                                        | `intent_class == "cbp_generic"`         |
-| `sec_assessment`      | Security Assessment Agent  | Data Query Agent (always), Knowledge Agent (conditional)                 | `findings[]`, `summary`, `prioritized_risks[]`                                   | `intent_class == "sec_assessment"`      |
-| `sec_expert_insights` | Security Assessment Agent  | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | `findings[]`, `summary`                                                          | `intent_class == "sec_expert_insights"` |
-| `sec_generic`         | Security Assessment Agent  | Knowledge Agent (always)                                                 | `summary`                                                                        | `intent_class == "sec_generic"`         |
+| Skill                 | Agent                      | Required Upstream                                                        | Outputs                                                                                               | Trigger                              |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `cbp_assessment`      | Config Best Practice Agent | Data Query Agent (always), Knowledge Agent (conditional)                 | Structured findings, natural language summary, prioritized risks, asset trend analysis, chart hints    | Intent is a Config Best Practice assessment query      |
+| `cbp_expert_insights` | Config Best Practice Agent | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | Structured findings, natural language summary                                                         | Intent is a Config Best Practice expert insights query |
+| `cbp_generic`         | Config Best Practice Agent | Knowledge Agent (always)                                                 | Natural language summary                                                                              | Intent is a generic Config Best Practice question      |
+| `sec_assessment`      | Security Assessment Agent  | Data Query Agent (always), Knowledge Agent (conditional)                 | Structured findings, natural language summary, prioritized risks                                      | Intent is a Security Assessment query                  |
+| `sec_expert_insights` | Security Assessment Agent  | SLIC Agent (always), Data Query Agent (always), Knowledge Agent (always) | Structured findings, natural language summary                                                         | Intent is a Security Assessment expert insights query  |
+| `sec_generic`         | Security Assessment Agent  | Knowledge Agent (always)                                                 | Natural language summary                                                                              | Intent is a generic Security Assessment question       |
 
 ### Supporting Agent Skills (TBD)
 
@@ -173,8 +176,8 @@ Each agent produces and consumes well-defined data artifacts.
 - `clarification_question` — only when ambiguous
 
 **Planner produces:**
-- `tasks[]` — ordered task list with agent assignments, dependencies, and embedded data requirements
-- `routing[]` — agent-to-task mapping
+- `tasks[]` — the complete task plan: all tasks with agent assignments, dependencies, status, and outputs
+- `routing[]` — the execution cursor: which task(s) and agent(s) to invoke next, driving the Planner's dispatch loop
 
 **Core Agents produce (per task):**
 | Agent            | Output Artifact                         | Description                                                    |
@@ -240,14 +243,14 @@ The remaining skills (`cbp_generic`, `sec_assessment`, `sec_expert_insights`, `s
 
 ### Data Query Agent: Dual-Path Retrieval
 
-The Data Query Agent has two retrieval strategies, selected deterministically:
+The Data Query Agent has two retrieval strategies, selected deterministically. The **Data Query Agent owns the MCP-vs-SQL decision** — the Planner assigns a data retrieval task without specifying which path to use, and the Data Query Agent selects the appropriate strategy internally based on intent, available MCP tools, and domain coverage.
 
 | Path         | When Used                                  | How It Works                                                                  |
 | ------------ | ------------------------------------------ | ----------------------------------------------------------------------------- |
-| **MCP Path** | Intent maps to a supported MCP tool        | Select tool by intent_class + entities → execute → normalize results          |
+| **MCP Path** | Intent maps to a supported MCP tool        | Select tool by intent + entities → execute → normalize results                |
 | **SQL Path** | Complex/bespoke intent, or MCP unavailable | Read schema + ontology → generate read-only SQL → execute → normalize results |
 
-> **Constraint:** For the Config Best Practice domain, the MCP path must provide complete data coverage — the SQL path is a migration bridge only. See §7 invariant #11.
+> **Constraint:** For any domain, the MCP path must provide complete data coverage — the SQL path is a migration bridge only. See §7 invariant #11.
 
 ### MCP Tool Design: Parameterized Approach
 
@@ -277,11 +280,12 @@ The current Config Best Practice MCP tool surface implements four parameterized 
 The execution follows a deterministic, single-pass pattern:
 
 1. **Classify** — Intent Classifier produces `intent_class`, `entities[]`, `confidence`
-2. **Gate** — If ambiguous (`confidence < 0.5`), return clarification question to user (short-circuit)
+2. **Gate** — If ambiguous (confidence below configurable threshold, e.g. 0.5), return clarification question to user (short-circuit)
 3. **Plan** — Planner reads intent, builds ordered `tasks[]` with dependencies and routing
-4. **Execute** — Tasks run sequentially respecting `depends_on[]`:
-   - Core agents run first (conditional, based on data dependencies)
-   - Domain agents run last (always, consume upstream outputs)
+4. **Execute** — Tasks run respecting `depends_on[]`:
+   - Tasks with no mutual dependency may run in parallel (e.g., Data Query Agent and Knowledge Agent when neither depends on the other)
+   - Core agents run before domain agents (core agents produce the data domain agents consume)
+   - Domain agents run last, consuming upstream outputs
 5. **Return** — Final STATE with all task outputs is returned
 
 There is **no replanning** in the current architecture. If data is insufficient, domain agents qualify their findings with `data_gaps[]`, `assumptions[]`, and lower `confidence` scores rather than requesting re-execution.
@@ -300,13 +304,23 @@ The Planner invokes agents by skill, based on the domain skill's data dependenci
 
 ### 6.3 Memory
 
-The Planner has access to a Memory store containing:
+Memory is accessible to all agents. It contains:
 - **Conversation history** — multi-turn context
 - **Personalization** — user preferences and context
 - **Self-corrections** — prior corrections applied during the session
 - **Agent memory** — learned patterns from prior executions
 
-Memory is a shared resource used by the Planner for context-aware planning. It is not a separate agent.
+Each agent may read conversation history, prior corrections, and relevant context from Memory to inform its execution. How Memory is shared across agents — whether via a shared state object, injected context, or other mechanism — is an implementation concern. Per-agent Memory usage patterns are documented in the individual agent contracts (`agents/*.md`).
+
+Memory is not a separate agent.
+
+### 6.4 Error Propagation
+
+When an upstream agent fails to produce output, the error propagation policy depends on whether the dependency is required or optional (as declared in the domain skill's "Required Upstream" column in §2):
+
+- **Required dependency fails → fail-stop.** If a required upstream agent cannot produce output (e.g., Data Query Agent MCP call fails for a `cbp_assessment` task), execution terminates. The failure reason is returned to the user with a clear explanation of which agent failed and why the request could not be completed.
+- **Optional dependency fails → fail-forward.** If a conditional/optional upstream agent cannot produce output (e.g., Knowledge Agent retrieval returns nothing for a `cbp_assessment` task where Knowledge Agent is conditional), execution continues. The domain agent proceeds with degraded inputs and must qualify its outputs — surfacing the missing dependency in its results so the user understands which context was unavailable and how it affects the analysis.
+- **All failures are traced.** Whether fail-stop or fail-forward, the failure is recorded in the execution trace with the agent name, failure reason, and impact on downstream tasks.
 
 ---
 
@@ -393,6 +407,7 @@ This logical view is deliberately deployment-agnostic. The following concerns ar
 
 | Concern                                                 | Document                                                                             |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Formal GraphState schema (concrete state structure)     | Implementation layer (derives from §4.2 data contracts)                              |
 | How agents are deployed (services vs. graph nodes)      | [deployment_options.md](deployment_options.md)                                       |
 | Whether core agents are shared or duplicated per domain | [deployment_options.md](deployment_options.md)                                       |
 | Communication protocol (A2A, HTTP, shared state)        | [deployment_options.md](deployment_options.md)                                       |
